@@ -21,10 +21,18 @@ export async function renderDashboard() {
 
         // Calculate completion metrics
         let completedCheckins = 0;
-        const totalCheckins = 5; // 2 Habits + Sleep + Mood + Water
+        let habitsCompleted = 0;
+        const totalCheckins = ALL_HABITS.length + 3; // 8 Habits + Sleep + Mood + Water
+        
+        if (!todayLog.habits) todayLog.habits = {};
 
-        if (todayLog.habits['h1']) completedCheckins++;
-        if (todayLog.habits['h2']) completedCheckins++;
+        for (const habit of ALL_HABITS) {
+            if (todayLog.habits[habit.id]) {
+                completedCheckins++;
+                habitsCompleted++;
+            }
+        }
+
         if (todayLog.sleep) completedCheckins++;
         if (todayLog.mood) completedCheckins++;
         if ((todayLog.water || 0) > 0) completedCheckins++;
@@ -64,6 +72,8 @@ export async function renderDashboard() {
             todayLog, finances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage 
         });
 
+        // Ensure dynamic dom texts are synced
+        await recalculateProgress();
     } catch (e) {
         console.error(e);
         root.innerHTML = `<div style="color:red; padding:20px; word-break:break-all;"><h3>Erro no Dashboard:</h3><pre>${e.message}\n${e.stack}</pre></div>`;
@@ -107,6 +117,144 @@ window.closeCheckinModal = () => {
         el.classList.add('hidden');
         el.classList.remove('flex');
     }, 500); // matches duration-500
+};
+
+// ----- LIBRARY SECTION LOGIC -----
+
+window.openLibraryModal = () => {
+    const el = document.getElementById('library-modal');
+    const overlay = document.getElementById('library-modal-overlay');
+    const sheet = document.getElementById('library-modal-sheet');
+
+    el.classList.remove('hidden');
+    el.classList.add('flex');
+    
+    requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        sheet.classList.remove('translate-y-full');
+    });
+};
+
+window.closeLibraryModal = () => {
+    const el = document.getElementById('library-modal');
+    const overlay = document.getElementById('library-modal-overlay');
+    const sheet = document.getElementById('library-modal-sheet');
+
+    overlay.classList.add('opacity-0');
+    sheet.classList.add('translate-y-full');
+    setTimeout(() => {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+    }, 500);
+};
+
+window.openLibraryForm = (id = null) => {
+    const el = document.getElementById('library-form-modal');
+    const overlay = document.getElementById('library-form-overlay');
+    const sheet = document.getElementById('library-form-sheet');
+    const title = document.getElementById('lbl-lib-form-title');
+    const btnDel = document.getElementById('btn-lib-delete');
+
+    // Default to 'course' UI state
+    window.setLibraryType('course');
+    window.setLibraryRating(0); // Clear stars
+    
+    // Simulate setting 'in_progress' by default
+    const progBtn = document.querySelector('.lib-status-btn[data-val="in_progress"]');
+    if (progBtn) window.setLibraryStatus(progBtn);
+
+    if (id && id.startsWith('mock_')) {
+        title.innerText = 'Editar Obra';
+        btnDel.classList.remove('hidden'); // Show delete button
+        // Fake populate logic for MVP UI
+        document.getElementById('lib-emoji').value = '🎓';
+        document.getElementById('lib-title').value = 'UI Design Avançado';
+        document.getElementById('lib-author').value = 'Figma Master';
+        document.getElementById('lib-current').value = '12';
+        document.getElementById('lib-total').value = '50';
+        window.setLibraryRating(5);
+    } else {
+        title.innerText = 'Nova Obra';
+        btnDel.classList.add('hidden');
+        // Clear inputs
+        document.querySelectorAll('#library-form-sheet input, #library-form-sheet textarea').forEach(inp => inp.value = '');
+    }
+
+    el.classList.remove('hidden');
+    el.classList.add('flex');
+    
+    requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        sheet.classList.remove('translate-y-full');
+    });
+};
+
+window.closeLibraryForm = () => {
+    const el = document.getElementById('library-form-modal');
+    const overlay = document.getElementById('library-form-overlay');
+    const sheet = document.getElementById('library-form-sheet');
+
+    overlay.classList.add('opacity-0');
+    sheet.classList.add('translate-y-full');
+    setTimeout(() => {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+    }, 300);
+};
+
+window.setLibraryType = (type) => {
+    const btnCourse = document.getElementById('btn-type-course');
+    const btnBook = document.getElementById('btn-type-book');
+
+    if (type === 'course') {
+        btnCourse.classList.add('bg-primary/20', 'text-primary', 'accent-text');
+        btnCourse.classList.remove('text-on-surface-variant', 'bg-transparent', 'hover:bg-white/5');
+        btnBook.classList.remove('bg-primary/20', 'text-primary', 'accent-text');
+        btnBook.classList.add('text-on-surface-variant', 'bg-transparent', 'hover:bg-white/5');
+    } else {
+        btnBook.classList.add('bg-primary/20', 'text-primary', 'accent-text');
+        btnBook.classList.remove('text-on-surface-variant', 'bg-transparent', 'hover:bg-white/5');
+        btnCourse.classList.remove('bg-primary/20', 'text-primary', 'accent-text');
+        btnCourse.classList.add('text-on-surface-variant', 'bg-transparent', 'hover:bg-white/5');
+    }
+};
+
+window.setLibraryStatus = (element) => {
+    // Reset all status buttons
+    document.querySelectorAll('.lib-status-btn').forEach(btn => {
+        // Clear all colored borders and bg overrides
+        btn.classList.remove('border-blue-400', 'bg-blue-400/20', 'text-blue-400', 'border-primary', 'bg-primary/20', 'text-primary', 'accent-text', 'accent-border');
+        btn.classList.add('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    });
+
+    const val = element.getAttribute('data-val');
+    element.classList.remove('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    
+    if (val === 'in_progress') {
+        element.classList.add('border-blue-400', 'bg-blue-400/20', 'text-blue-400');
+    } else if (val === 'done') {
+        element.classList.add('border-primary', 'bg-primary/20', 'text-primary', 'accent-text', 'accent-border'); // Green
+    } else {
+        element.classList.add('text-white', 'border-white/50'); // to_do is highlighted white when selected
+    }
+};
+
+window.setLibraryRating = (score) => {
+    const stars = document.querySelectorAll('.lib-star');
+    stars.forEach((star, index) => {
+        if (index < score) {
+            star.classList.remove('grayscale', 'opacity-30');
+            star.classList.add('filter-none', 'opacity-100');
+        } else {
+            star.classList.add('grayscale', 'opacity-30');
+            star.classList.remove('filter-none', 'opacity-100');
+        }
+    });
+};
+
+window.saveLibraryForm = () => {
+    // Fake UX trigger. Closes Form Modal returning users to Library List UI feeling accomplished.
+    window.closeLibraryForm();
 };
 
 window.setWaterInput = (liters) => {
@@ -188,14 +336,25 @@ window.updateWater = async (diff) => {
 async function recalculateProgress() {
     const todayLog = await DB.getTodayLog();
     let comp = 0;
-    if (todayLog.habits['h1']) comp++;
-    if (todayLog.habits['h2']) comp++;
+    let habitsCompleted = 0;
+    
+    if (!todayLog.habits) todayLog.habits = {};
+    for (const habit of ALL_HABITS) {
+        if (todayLog.habits[habit.id]) {
+            comp++;
+            habitsCompleted++;
+        }
+    }
+
     if (todayLog.sleep) comp++;
     if (todayLog.mood) comp++;
     if ((todayLog.water || 0) > 0) comp++;
     
-    const tota = 5;
+    const tota = ALL_HABITS.length + 3;
     const progressW = (comp / tota) * 100;
+    
+    const lblHabitCounter = document.getElementById('lbl-habit-counter');
+    if (lblHabitCounter) lblHabitCounter.innerText = `${habitsCompleted}/${ALL_HABITS.length}`;
     
     const internalBar = document.getElementById('checkin-internal-bar');
     if (internalBar) internalBar.style.width = `${progressW}%`;
