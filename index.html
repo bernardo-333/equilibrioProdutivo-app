@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html class="dark" lang="pt-BR">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="theme-color" content="#1E1E1E">
+    <title>Equilíbrio Produtivo</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.json">
+    
+    <!-- Tailwind CSS (CDN for MVP) -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="./css/style.css">
+    
+    <!-- Tailwind Configuration (MVP fallback) -->
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-highest": "#333333",
+              "surface-container-low": "#242424",
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="antialiased">
+
+<header id="main-header" class="fixed top-0 w-full z-50 bg-[#1E1E1E]/80 backdrop-blur-xl flex items-center justify-between px-6 py-4 transition-all duration-300 ease-in-out shadow-[0_10px_40px_-10px_rgba(0,0,0,0.04)]">
+    <div class="flex flex-col flex-1">
+        <span class="text-3xl font-extrabold tracking-tighter text-white font-headline" id="header-title"><span class="text-xl accent-text">Bom dia</span><br/>Bernardo</span>
+    </div>
+    <div class="flex items-center text-right flex-shrink-0 ml-4">
+        <span id="header-date" class="text-xs sm:text-sm font-extrabold accent-text capitalize tracking-tight whitespace-nowrap"></span>
+    </div>
+</header>
+
+<main class="mt-24 px-6 max-w-2xl mx-auto" id="app-container">
+
+    <!-- Tab 1: Resumo (Dashboard) -->
+    <section id="tab-dashboard" class="tab-content active">
+        <!-- Dashboard Content will be rendered by ui-dashboard.js -->
+        <div id="dashboard-root">
+            <p class="text-center text-on-surface-variant mt-10">Carregando métricas...</p>
+        </div>
+    </section>
+
+    <!-- Tab 2: Visão Mensal / Kanban -->
+    <section id="tab-monthly" class="tab-content">
+        <!-- Monthly/Kanban Content will be rendered by ui-monthly.js -->
+        <div id="monthly-root">
+             <p class="text-center text-on-surface-variant mt-10">Carregando calendário...</p>
+        </div>
+    </section>
+
+    <!-- Tab 3: Financeiro -->
+    <section id="tab-finances" class="tab-content">
+        <!-- Finances Content will be rendered by ui-finances.js -->
+        <div id="finances-root">
+             <p class="text-center text-on-surface-variant mt-10">Carregando finanças...</p>
+        </div>
+    </section>
+
+    <!-- Tab 4: Configurações -->
+    <section id="tab-settings" class="tab-content">
+        <!-- Settings Content will be rendered by ui-settings.js -->
+        <div id="settings-root">
+             <p class="text-center text-on-surface-variant mt-10">Carregando configurações...</p>
+        </div>
+    </section>
+
+</main>
+
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#1E1E1E]/80 backdrop-blur-xl shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.4)] border-t border-white/5">
+    
+    <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer accent-text" data-target="tab-dashboard" data-title="<span class='text-xl accent-text'>Bom dia</span><br/>Bernardo" id="nav-dashboard">
+        <span class="material-symbols-outlined filled" data-icon="dashboard">dashboard</span>
+        <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Resumo</span>
+    </div>
+
+    <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-monthly" data-title="Planejamento" id="nav-monthly">
+        <span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+        <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Mensal</span>
+    </div>
+
+    <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-finances" data-title="Financeiro" id="nav-finances">
+        <span class="material-symbols-outlined" data-icon="payments">payments</span>
+        <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Finanças</span>
+    </div>
+
+    <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-settings" data-title="Configurações" id="nav-settings">
+        <span class="material-symbols-outlined" data-icon="settings">settings</span>
+        <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Ajustes</span>
+    </div>
+
+</nav>
+
+<!-- JavaScript Modules -->
+<script type="module" src="./js/app.js"></script>
+
+</body>
+</html>
