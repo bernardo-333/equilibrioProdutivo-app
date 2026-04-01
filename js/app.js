@@ -1,6 +1,6 @@
 import { DB } from './database.js';
 import { renderDashboard } from './controllers/dashboard-controller.js';
-import { renderMonthly } from './ui-monthly.js';
+import { renderPlanner } from './controllers/planner-controller.js';
 import { renderFinances } from './ui-finances.js';
 import { renderSettings } from './ui-settings.js';
 
@@ -97,8 +97,8 @@ class App {
             case 'tab-dashboard':
                 renderDashboard();
                 break;
-            case 'tab-monthly':
-                renderMonthly();
+            case 'tab-planner':
+                renderPlanner();
                 break;
             case 'tab-finances':
                 renderFinances();

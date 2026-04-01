@@ -54,11 +54,11 @@
         </div>
     </section>
 
-    <!-- Tab 2: Visão Mensal / Kanban -->
-    <section id="tab-monthly" class="tab-content">
-        <!-- Monthly/Kanban Content will be rendered by ui-monthly.js -->
-        <div id="monthly-root">
-             <p class="text-center text-on-surface-variant mt-10">Carregando calendário...</p>
+    <!-- Tab 2: Planner (Heatmap, Diário, Kanban) -->
+    <section id="tab-planner" class="tab-content">
+        <!-- Planner Content will be rendered by planner-controller.js -->
+        <div id="planner-root">
+             <p class="text-center text-on-surface-variant mt-10">Carregando plano...</p>
         </div>
     </section>
 
@@ -88,9 +88,9 @@
         <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Resumo</span>
     </div>
 
-    <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-monthly" data-title="Planejamento" id="nav-monthly">
-        <span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
-        <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Mensal</span>
+    <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-planner" data-title="Planner" id="nav-planner">
+        <span class="material-symbols-outlined" data-icon="radar">radar</span>
+        <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Planner</span>
     </div>
 
     <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-finances" data-title="Financeiro" id="nav-finances">
