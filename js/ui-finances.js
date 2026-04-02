@@ -9,6 +9,17 @@ export async function renderFinances() {
     const expense = finances.transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
 
     root.innerHTML = `
+        <!-- Banner Em Breve -->
+        <div class="mb-8 mt-2 bg-gradient-to-r from-primary/10 to-primary/5 rounded-3xl p-5 border border-primary/20 accent-border flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-primary accent-text" style="font-size:28px">rocket_launch</span>
+            </div>
+            <div>
+                <p class="text-sm font-bold text-[var(--text-primary)]">Em breve: melhorias financeiras</p>
+                <p class="text-[10px] text-on-surface-variant leading-relaxed mt-0.5">Categorias, gráficos mensais e metas de economia estão sendo preparados para uma atualização futura.</p>
+            </div>
+        </div>
+
         <!-- Saldo Geral -->
         <section class="mb-12 mt-2">
             <div class="flex flex-col gap-1">

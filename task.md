@@ -7,6 +7,8 @@
   - [x] Interface Responsiva Glass-card.
   - [x] Smart Scroll Header (Data/Nome).
   - [x] Weekly Snap gamificado e Pop-up de Finanças Simples.
+  - [x] Refatoração do Calendário de Consistência (7 colunas, 4 tons).
+  - [x] Integração de Médricas (Sono, Humor e Finanças) no estilo do Check-in.
   - [x] Refatoração para Padrão Vanilla MVC (Componentizado).
 - [x] Formulário Interativo do Check-in:
   - [x] Transformar botão vazio "Check-in de Hoje" em Modal Fullscreen de Abertura inferior.

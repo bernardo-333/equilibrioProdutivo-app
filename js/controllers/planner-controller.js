@@ -1,63 +1,545 @@
 import { DB } from '../database.js';
 import { getPlannerHTML } from '../views/planner-view.js';
+const HABITS = [
+    { id: 'wakeup_early', name: 'Acordar cedo' },
+    { id: 'gym', name: 'Academia' },
+    { id: 'breakfast', name: 'Café da manhã' },
+    { id: 'lunch', name: 'Almoço' },
+    { id: 'study_dio', name: 'Estudos DIO' },
+    { id: 'reading', name: 'Leitura' },
+    { id: 'dinner', name: 'Janta' },
+    { id: 'fill_notion', name: 'Preencher Notion' }
+];
+const TOTAL_CHECKINS = HABITS.length + 3; // habits + sleep + mood + water
+
+function calcDayPct(log) {
+    if (!log) return 0;
+    let c = 0;
+    const habits = log.habits || {};
+    for (const h of HABITS) { if (habits[h.id]) c++; }
+    if (log.sleep) c++;
+    if (log.mood) c++;
+    if ((log.water || 0) > 0) c++;
+    return Math.round((c / TOTAL_CHECKINS) * 100);
+}
 
 export async function renderPlanner() {
     const root = document.getElementById('planner-root');
-    const kanbanData = await DB.getKanbanData();
-    
-    // Mock metrics & history data that mimics Daily Log schema for MVP UI
-    const metrics = { perfectDays: 12, avgSleep: 'bom', avgMood: 'produtivo' };
-    const historyDays = [
-        { date: 'Qua, 15', pct: 80, mood: 'produtivo', sleep: 'bom', water: 2.0, telas: 1.5, habits: [{name:'Academia', done:true}, {name:'Leitura', done:false}, {name:'DIO', done:true}] },
-        { date: 'Ter, 14', pct: 100, mood: 'feliz', sleep: 'ruim', water: 1.0, telas: 3.5, habits: [{name:'Academia', done:true}, {name:'Leitura', done:true}, {name:'DIO', done:true}] },
-        { date: 'Seg, 13', pct: 40, mood: 'cansado', sleep: 'mais_ou_menos', water: 1.5, telas: 2.0, habits: [{name:'Academia', done:false}, {name:'Leitura', done:false}, {name:'DIO', done:false}] }
+    try {
+    let kanbanData = await DB.getKanbanData();
+
+    // Expose all cards globally for view modal lookup
+    window._kanbanAllCards = [
+        ...(kanbanData.ideas || []).map(c => ({...c, progress: 'ideas'})),
+        ...(kanbanData.doing || []).map(c => ({...c, progress: 'doing'})),
+        ...(kanbanData.done  || []).map(c => ({...c, progress: 'done'}))
     ];
 
-    // Inject HTML
-    root.innerHTML = getPlannerHTML({ historyDays, metrics, kanbanData });
+    // --- Build calendar and history from REAL daily_logs ---
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed
+    const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayDate = now.getDate();
 
-    // Initialize JavaScript interactive logic
-    initAccordionEvents();
-    initKanbanDragAndDrop();
-}
+    const monthLogs = await DB.getMonthlyLogs(yearMonth);
 
-/**
- * Handles the expansion logic for the "Diário de Bordo" table rows
- */
-function initAccordionEvents() {
-    const rows = document.querySelectorAll('.accordeon-row');
-    rows.forEach(row => {
-        row.addEventListener('click', (e) => {
-             // Block click if it was an internal button (like edit)
-             if (e.target.tagName.toLowerCase() === 'button') return;
+    // Calendar heatmap data
+    const calendarData = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
+        const log = monthLogs[ds];
+        const pct = calcDayPct(log);
+        let level = 0;
+        if (pct > 0 && pct <= 33) level = 1;
+        else if (pct > 33 && pct <= 66) level = 2;
+        else if (pct > 66) level = 3;
+        calendarData.push({ day: d, level, isFuture: d > todayDate });
+    }
 
-             const details = row.querySelector('.accordeon-details');
-             if(details.classList.contains('hidden')) {
-                 details.classList.remove('hidden');
-                 row.classList.add('bg-surface-highest'); // highlight active row
-             } else {
-                 details.classList.add('hidden');
-                 row.classList.remove('bg-surface-highest');
-             }
+    // History days (most recent first, only days with data)
+    const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const historyDays = [];
+    for (let d = todayDate; d >= 1; d--) {
+        const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
+        const log = monthLogs[ds];
+        if (!log) continue;
+        const pct = calcDayPct(log);
+        const habits = HABITS.map(h => ({ name: h.name, done: !!(log.habits && log.habits[h.id]) }));
+        historyDays.push({
+            date: `${String(d).padStart(2,'0')} ${monthNames[month]}`,
+            pct,
+            mood: log.mood || null,
+            sleep: log.sleep || null,
+            water: log.water || 0,
+            telas: log.screen_time || 0,
+            habits
         });
-    });
+    }
+
+    window._plannerHistory = historyDays;
+
+    // Calculate real metrics
+    const logsArr = Object.values(monthLogs);
+    const perfectDays = logsArr.filter(l => calcDayPct(l) === 100).length;
+
+    const sleepLabels = { 'perfeito': 5, 'muito_bom': 4, 'bom': 3, 'mais_ou_menos': 2, 'ruim': 1 };
+    const sleepReverse = { 5: 'perfeito', 4: 'muito_bom', 3: 'bom', 2: 'mais_ou_menos', 1: 'ruim' };
+    const moodLabels = { 'feliz': 5, 'produtivo': 4, 'normal': 3, 'cansado': 2, 'triste': 1 };
+    const moodReverse = { 5: 'feliz', 4: 'produtivo', 3: 'normal', 2: 'cansado', 1: 'triste' };
+
+    let sleepSum = 0, sleepCount = 0, moodSum = 0, moodCount = 0;
+    for (const l of logsArr) {
+        if (l.sleep && sleepLabels[l.sleep]) { sleepSum += sleepLabels[l.sleep]; sleepCount++; }
+        if (l.mood && moodLabels[l.mood]) { moodSum += moodLabels[l.mood]; moodCount++; }
+    }
+    const avgSleep = sleepCount > 0 ? sleepReverse[Math.round(sleepSum / sleepCount)] || 'bom' : '—';
+    const avgMood = moodCount > 0 ? moodReverse[Math.round(moodSum / moodCount)] || 'normal' : '—';
+
+    const finances = await DB.getFinances();
+
+    const metrics = {
+        perfectDays,
+        avgSleep,
+        avgMood,
+        totalGastoDia: finances.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+        totalGastoDinheiro: finances.balance
+    };
+
+    root.innerHTML = getPlannerHTML({ calendarData, historyDays, metrics, kanbanData });
+    initKanbanDragAndDrop();
+    } catch (e) {
+        console.error('Planner error:', e);
+        root.innerHTML = `<div style="color:red; padding:20px; word-break:break-all;"><h3>Erro no Planner:</h3><pre>${e.message}\n${e.stack}</pre></div>`;
+    }
 }
 
-/**
- * Handles HTML5 drag and drop events for the Kanban board
- */
+// ----- DAILY DETAIL LOGIC -----
+
+window.openDailyDetail = (date) => {
+    const day = window._plannerHistory.find(d => d.date === date);
+    if (!day) return;
+
+    const modal = document.getElementById('day-detail-modal');
+    const overlay = document.getElementById('day-detail-overlay');
+    const sheet = document.getElementById('day-detail-sheet');
+    const content = document.getElementById('day-detail-content');
+
+    document.getElementById('lbl-day-title').innerText = day.date;
+    document.getElementById('lbl-day-pct').innerText = `${day.pct}% Concluído`;
+
+    // Populate content — visual identical to Check-in modal
+    const moodLabels = { nervoso:'Nervoso', feliz:'Feliz', produtivo:'Produtivo', normal:'Normal', ansioso:'Ansioso', cansado:'Cansado', triste:'Triste' };
+    const moodClasses = {
+        nervoso: 'border-red-500 bg-red-500/20 text-red-500',
+        feliz: 'border-green-400 bg-green-400/20 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]',
+        produtivo: 'border-cyan-400 bg-cyan-400/20 text-cyan-400',
+        normal: 'border-white/50 bg-white/10 text-white',
+        ansioso: 'border-orange-400 bg-orange-400/20 text-orange-400',
+        cansado: 'border-purple-400 bg-purple-400/20 text-purple-400',
+        triste: 'border-blue-400 bg-blue-400/20 text-blue-400'
+    };
+    const sleepLabels = { perfeito:'Perfeito', muito_bom:'Muito bom', bom:'Bom', mais_ou_menos:'Mais ou menos', ruim:'Ruim' };
+    const sleepClasses = {
+        perfeito: 'border-purple-400 bg-purple-400/20 text-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.3)]',
+        muito_bom: 'border-blue-400 bg-blue-400/20 text-blue-400',
+        bom: 'border-cyan-400 bg-cyan-400/20 text-cyan-400',
+        mais_ou_menos: 'border-orange-400 bg-orange-400/20 text-orange-400',
+        ruim: 'border-red-500 bg-red-500/20 text-red-500'
+    };
+
+    const waterFilled = Math.round(day.water);
+    const waterDrops = [1,2,3,4,5].map(i =>
+        `<span class="text-4xl transition-all duration-300 ${i <= waterFilled ? 'drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]' : 'grayscale opacity-30'}">💧</span>`
+    ).join('');
+
+    content.innerHTML = `
+        <!-- Seção 1: Como você se sentiu (mesmo estilo do Check-in) -->
+        <section class="space-y-4">
+            <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Como você se sentiu?</h3>
+            <div class="bg-surface-container-highest rounded-3xl p-5 border border-white/5 space-y-6">
+
+                <!-- Humor chips (read-only, ativo destacado) -->
+                <div class="space-y-3">
+                    <span class="text-sm font-bold text-[var(--text-primary)] block">Humor Geral</span>
+                    <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width:none;">
+                        ${Object.keys(moodLabels).map(key => `
+                            <span class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
+                                ${key === day.mood
+                                    ? moodClasses[key]
+                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30'
+                                }">${moodLabels[key]}</span>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="h-px w-full bg-white/5"></div>
+
+                <!-- Sono chips (read-only, ativo destacado) -->
+                <div class="space-y-3">
+                    <span class="text-sm font-bold text-[var(--text-primary)] block">Qualidade do Sono</span>
+                    <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width:none;">
+                        ${Object.keys(sleepLabels).map(key => `
+                            <span class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
+                                ${key === day.sleep
+                                    ? sleepClasses[key]
+                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30'
+                                }">${sleepLabels[key]}</span>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção 2: Corpo e Tempo -->
+        <section class="space-y-4">
+            <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Seu corpo e tempo</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Telas -->
+                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2">
+                    <span class="text-xs font-bold text-on-surface-variant px-1">Instagram</span>
+                    <div class="text-2xl font-extrabold text-[var(--text-primary)] font-headline pl-1">${day.telas}h</div>
+                </div>
+                <!-- Wake up - placeholder pois não temos no mock -->
+                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2">
+                    <span class="text-xs font-bold text-on-surface-variant px-1">Acordei às</span>
+                    <div class="text-2xl font-extrabold text-[var(--text-primary)] font-headline pl-1">06:30</div>
+                </div>
+                <!-- Água -->
+                <div class="col-span-2 bg-surface-container rounded-3xl p-5 border border-white/5 flex flex-col items-center gap-4">
+                    <span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest text-center">Água Consumida (1 Gota = 1 Litro)</span>
+                    <div class="flex items-center gap-3">
+                        ${waterDrops}
+                    </div>
+                    <span class="text-[10px] font-bold text-cyan-400 tracking-widest">${day.water}L no total</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção 3: As 8 Rotinas (mesmo layout do Check-in) -->
+        <section class="space-y-4">
+            <div class="flex justify-between items-center pl-2 pr-1">
+                <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70">As 8 Rotinas</h3>
+                <span class="text-[10px] font-bold text-primary accent-text">${day.habits.filter(h=>h.done).length}/${day.habits.length}</span>
+            </div>
+            <div class="bg-surface-container rounded-[32px] p-2 space-y-1 border border-white/5">
+                ${day.habits.map(h => `
+                    <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : ''} transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-surface-highest flex items-center justify-center">
+                                <span class="material-symbols-outlined text-lg ${h.done ? 'text-primary accent-text' : 'text-on-surface-variant'}" style="font-variation-settings: 'FILL' ${h.done ? 1 : 0};">task_alt</span>
+                            </div>
+                            <span class="text-base font-bold transition-all ${h.done ? 'line-through opacity-50 text-on-surface-variant' : 'text-[var(--text-primary)]'}">${h.name}</span>
+                        </div>
+                        <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all
+                            ${h.done ? 'bg-primary accent-bg border-primary accent-border' : 'border-on-surface-variant/30'}">
+                            ${h.done ? '<span class="material-symbols-outlined text-black font-bold mix-blend-color-burn" style="font-size:16px;">check</span>' : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </section>
+    `;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        sheet.classList.remove('translate-y-full');
+    });
+};
+
+window.closeDailyDetail = () => {
+    const modal = document.getElementById('day-detail-modal');
+    const overlay = document.getElementById('day-detail-overlay');
+    const sheet = document.getElementById('day-detail-sheet');
+
+    overlay.classList.add('opacity-0');
+    sheet.classList.add('translate-y-full');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 500);
+};
+
+window.editSpecificDay = () => {
+    // For MVP leads to the same check-in modal or a copy
+    window.closeDailyDetail();
+    // In a real app we'd load this day's data into the checkin form
+};
+
+// ----- FULL HISTORY LOGIC -----
+
+window.openFullHistory = () => {
+    const modal = document.getElementById('full-history-modal');
+    const sheet = document.getElementById('full-history-sheet');
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+        sheet.classList.remove('scale-95', 'opacity-0');
+    });
+};
+
+window.closeFullHistory = () => {
+    const modal = document.getElementById('full-history-modal');
+    const sheet = document.getElementById('full-history-sheet');
+
+    sheet.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 300);
+};
+
+// ----- KANBAN VIEW & FORM LOGIC -----
+
+const _typeLabels = { estudo:'📚 Estudo', hobbie:'🎮 Hobbie', crescimento:'🌱 Crescimento', trabalho:'💼 Trabalho', saude:'🏋️ Saúde', outro:'📌 Outro' };
+const _progressLabels = { ideas:'A Iniciar', doing:'Em Progresso', done:'Feito ✅' };
+const _progressColors = { ideas:'text-on-surface-variant/60', doing:'text-blue-400', done:'text-green-400' };
+
+let _editingKanbanId = null;
+let _viewingCard = null; // store current card for edit transition
+
+// --- VIEW MODAL ---
+
+window.openKanbanView = (cardId) => {
+    // Find card from all columns rendered on DOM
+    const cardEl = document.querySelector(`.kanban-card[data-id="${cardId}"]`);
+    // Build card object from data-attributes or window store
+    const card = (window._kanbanAllCards || []).find(c => c.id === cardId) || {
+        id: cardId,
+        emoji: cardEl?.querySelector('span.text-2xl')?.innerText || '🎯',
+        title: cardEl?.querySelector('p')?.innerText || '',
+        type: '', objective: '', description: '', start: '', end: ''
+    };
+    _viewingCard = card;
+
+    // Populate header
+    document.getElementById('lbl-kv-emoji').innerText = card.emoji || '🎯';
+    document.getElementById('lbl-kv-title').innerText = card.title || '';
+    document.getElementById('lbl-kv-type').innerText = _typeLabels[card.type] || '';
+
+    // Build body content
+    const rows = [];
+    if (card.objective) rows.push(`
+        <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5 space-y-1">
+            <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block">Objetivo</span>
+            <p class="font-bold text-[var(--text-primary)] text-base leading-snug">${card.objective}</p>
+        </div>`);
+    if (card.start || card.end) rows.push(`
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5">
+                <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block mb-1">Início</span>
+                <p class="font-bold text-[var(--text-primary)]">${card.start || '—'}</p>
+            </div>
+            <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5">
+                <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block mb-1">Término</span>
+                <p class="font-bold text-[var(--text-primary)]">${card.end || '—'}</p>
+            </div>
+        </div>`);
+    const progColor = _progressColors[card.progress] || 'text-on-surface-variant/60';
+    rows.push(`
+        <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5 flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest">Progresso</span>
+            <span class="font-bold text-sm ${progColor}">${_progressLabels[card.progress] || 'A Iniciar'}</span>
+        </div>`);
+    if (card.description) rows.push(`
+        <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5 space-y-2">
+            <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block">Descrição</span>
+            <p class="text-[var(--text-primary)] text-sm leading-relaxed">${card.description}</p>
+        </div>`);
+
+    document.getElementById('kanban-view-content').innerHTML = rows.join('') || `<p class="text-center text-on-surface-variant/30 text-sm py-8">Sem detalhes adicionados.</p>`;
+
+    const modal = document.getElementById('kanban-view-modal');
+    const overlay = document.getElementById('kanban-view-overlay');
+    const sheet = document.getElementById('kanban-view-sheet');
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        sheet.classList.remove('translate-y-full');
+    });
+};
+
+window.closeKanbanView = () => {
+    const modal = document.getElementById('kanban-view-modal');
+    const overlay = document.getElementById('kanban-view-overlay');
+    const sheet = document.getElementById('kanban-view-sheet');
+
+    overlay.classList.add('opacity-0');
+    sheet.classList.add('translate-y-full');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 500);
+};
+
+window.openKanbanEditFromView = () => {
+    // Close view first, then open edit
+    window.closeKanbanView();
+    setTimeout(() => {
+        window.openKanbanForm(_viewingCard?.id, _viewingCard);
+    }, 200);
+};
+
+// --- FORM MODAL (Create / Edit) ---
+
+window.openKanbanForm = (cardId, cardData) => {
+    const modal = document.getElementById('kanban-form-modal');
+    const overlay = document.getElementById('kanban-form-overlay');
+    const sheet = document.getElementById('kanban-form-sheet');
+
+    // Reset type + progress buttons first
+    document.querySelectorAll('.kanban-type-btn').forEach(b => {
+        b.classList.remove('border-primary', 'bg-primary/20', 'text-primary');
+        b.classList.add('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    });
+    document.querySelectorAll('.kanban-progress-btn').forEach(b => {
+        b.classList.remove('border-blue-400', 'bg-blue-400/20', 'text-blue-400');
+        b.classList.add('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    });
+
+    if (cardId && cardData) {
+        // EDIT mode — pre-fill all fields
+        _editingKanbanId = cardId;
+        document.getElementById('lbl-kanban-form-title').innerText = 'Editar Card';
+        document.getElementById('btn-kanban-delete').classList.remove('hidden');
+
+        document.getElementById('kanban-emoji').value = cardData.emoji || '';
+        document.getElementById('kanban-title').value = cardData.title || '';
+        document.getElementById('kanban-objective').value = cardData.objective || '';
+        document.getElementById('kanban-description').value = cardData.description || '';
+        document.getElementById('kanban-start').value = cardData.start || '';
+        document.getElementById('kanban-end').value = cardData.end || '';
+
+        if (cardData.type) {
+            const typeBtn = document.querySelector(`.kanban-type-btn[data-val="${cardData.type}"]`);
+            if (typeBtn) window.setKanbanType(typeBtn);
+        }
+        const progress = cardData.progress || 'ideas';
+        const progBtn = document.querySelector(`.kanban-progress-btn[data-val="${progress}"]`);
+        if (progBtn) window.setKanbanProgress(progBtn);
+    } else {
+        // CREATE mode
+        _editingKanbanId = null;
+        document.getElementById('lbl-kanban-form-title').innerText = 'Novo Card';
+        document.getElementById('btn-kanban-delete').classList.add('hidden');
+
+        document.getElementById('kanban-emoji').value = '';
+        document.getElementById('kanban-title').value = '';
+        document.getElementById('kanban-objective').value = '';
+        document.getElementById('kanban-description').value = '';
+        document.getElementById('kanban-start').value = '';
+        document.getElementById('kanban-end').value = '';
+
+        const defaultBtn = document.querySelector('.kanban-progress-btn[data-val="ideas"]');
+        if (defaultBtn) window.setKanbanProgress(defaultBtn);
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        sheet.classList.remove('translate-y-full');
+    });
+};
+
+window.closeKanbanForm = () => {
+    const modal = document.getElementById('kanban-form-modal');
+    const overlay = document.getElementById('kanban-form-overlay');
+    const sheet = document.getElementById('kanban-form-sheet');
+
+    overlay.classList.add('opacity-0');
+    sheet.classList.add('translate-y-full');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 400);
+};
+
+window.setKanbanType = (btn) => {
+    document.querySelectorAll('.kanban-type-btn').forEach(b => {
+        b.classList.remove('border-primary', 'bg-primary/20', 'text-primary');
+        b.classList.add('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    });
+    btn.classList.remove('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    btn.classList.add('border-primary', 'bg-primary/20', 'text-primary');
+};
+
+window.setKanbanProgress = (btn) => {
+    document.querySelectorAll('.kanban-progress-btn').forEach(b => {
+        b.classList.remove('border-blue-400', 'bg-blue-400/20', 'text-blue-400');
+        b.classList.add('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    });
+    btn.classList.remove('border-white/10', 'bg-surface-highest', 'text-on-surface-variant');
+    btn.classList.add('border-blue-400', 'bg-blue-400/20', 'text-blue-400');
+};
+
+window.saveKanbanForm = async () => {
+    const title = document.getElementById('kanban-title').value.trim();
+    if (!title) {
+        document.getElementById('kanban-title').focus();
+        return;
+    }
+
+    const card = {
+        id: _editingKanbanId || Date.now().toString(),
+        emoji: document.getElementById('kanban-emoji').value,
+        title,
+        type: document.querySelector('.kanban-type-btn.text-primary')?.dataset.val || '',
+        start: document.getElementById('kanban-start').value,
+        end: document.getElementById('kanban-end').value,
+        objective: document.getElementById('kanban-objective').value,
+        description: document.getElementById('kanban-description').value
+    };
+
+    const progress = document.querySelector('.kanban-progress-btn.text-blue-400')?.dataset.val || 'ideas';
+
+    let kanbanData = await DB.getKanbanData();
+    if (!kanbanData.ideas) kanbanData.ideas = [];
+    if (!kanbanData.doing) kanbanData.doing = [];
+    if (!kanbanData.done) kanbanData.done = [];
+
+    // Remove card from all columns first (handles both edit and move)
+    ['ideas', 'doing', 'done'].forEach(col => {
+        kanbanData[col] = kanbanData[col].filter(c => c.id !== card.id);
+    });
+
+    // Add to the correct column
+    kanbanData[progress].push(card);
+
+    await DB.saveKanbanData(kanbanData);
+    window.closeKanbanForm();
+    setTimeout(() => renderPlanner(), 400);
+};
+
+window.deleteKanbanCard = async () => {
+    if (_editingKanbanId && confirm('Tem certeza que deseja excluir este card?')) {
+        let kanbanData = await DB.getKanbanData();
+        ['ideas', 'doing', 'done'].forEach(col => {
+            kanbanData[col] = (kanbanData[col] || []).filter(c => c.id !== _editingKanbanId);
+        });
+        await DB.saveKanbanData(kanbanData);
+        window.closeKanbanForm();
+        setTimeout(() => renderPlanner(), 400);
+    }
+};
+
+
+
 function initKanbanDragAndDrop() {
     let draggedItem = null;
-    
     const cards = document.querySelectorAll('.kanban-card');
     const columns = document.querySelectorAll('.kanban-column');
-
     cards.forEach(card => {
         card.addEventListener('dragstart', function(e) {
             draggedItem = this;
             setTimeout(() => this.classList.add('opacity-30', 'scale-95'), 0);
         });
-        
         card.addEventListener('dragend', function() {
             setTimeout(() => {
                 this.classList.remove('opacity-30', 'scale-95');
@@ -65,40 +547,35 @@ function initKanbanDragAndDrop() {
             }, 0);
         });
     });
-
     columns.forEach(col => {
-        col.addEventListener('dragover', function(e) {
-            e.preventDefault(); // necessary to allow 'drop'
-        });
-        
-        col.addEventListener('dragenter', function(e) {
-            e.preventDefault();
-            this.classList.add('border-primary/50', 'bg-white/5');
-            this.classList.remove('border-white/5');
-        });
-        
-        col.addEventListener('dragleave', function() {
-            this.classList.remove('border-primary/50', 'bg-white/5');
-            this.classList.add('border-white/5');
-        });
-        
+        col.addEventListener('dragover', function(e) { e.preventDefault(); });
+        col.addEventListener('dragenter', function(e) { e.preventDefault(); this.classList.add('border-primary/50', 'bg-white/5'); });
+        col.addEventListener('dragleave', function() { this.classList.remove('border-primary/50', 'bg-white/5'); });
         col.addEventListener('drop', async function() {
             this.classList.remove('border-primary/50', 'bg-white/5');
-            this.classList.add('border-white/5');
-            
             if (draggedItem) {
-                // If dropping into empty message, clear it
-                const emptyMsg = this.querySelector('p');
+                const emptyMsg = this.querySelector('p, .opacity-30');
                 if (emptyMsg) emptyMsg.remove();
-                
                 this.appendChild(draggedItem);
-                
-                // Real DB save logic for MVP:
-                /*
-                const itemId = draggedItem.dataset.id;
-                const newColId = this.dataset.col; // 'ideas', 'doing', 'done'
-                // call DB logic...
-                */
+
+                // Persist column move to DB
+                const cardId = draggedItem.dataset.cardId;
+                const newColumn = this.dataset.column; // 'ideas', 'doing', or 'done'
+                if (cardId && newColumn) {
+                    let kanbanData = await DB.getKanbanData();
+                    let movedCard = null;
+                    ['ideas', 'doing', 'done'].forEach(c => {
+                        const idx = (kanbanData[c] || []).findIndex(card => card.id === cardId);
+                        if (idx >= 0) {
+                            movedCard = kanbanData[c].splice(idx, 1)[0];
+                        }
+                    });
+                    if (movedCard) {
+                        if (!kanbanData[newColumn]) kanbanData[newColumn] = [];
+                        kanbanData[newColumn].push(movedCard);
+                        await DB.saveKanbanData(kanbanData);
+                    }
+                }
             }
         });
     });

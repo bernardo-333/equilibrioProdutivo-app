@@ -1,6 +1,42 @@
 export function getDashboardHTML({ 
-    todayLog, finances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS, snapMessage 
+    todayLog, finances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS, snapMessage, libraryItems 
 }) {
+    // Helper: render a library carousel card
+    const renderLibCard = (item) => {
+        const pct = item.total > 0 ? Math.round((item.current / item.total) * 100) : 0;
+        const isBook = item.type === 'book';
+        const statusLabels = { to_do: 'Para Iniciar', in_progress: 'Em Andamento', done: 'Concluído' };
+        const statusColors = { to_do: 'text-on-surface-variant/60 bg-white/5 border-white/10', in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20', done: 'text-green-400 bg-green-400/10 border-green-400/20' };
+        const barColor = isBook ? 'bg-cyan-400 shadow-[0_0_8px_rgba(136,235,255,0.4)]' : 'bg-primary accent-bg shadow-[0_0_8px_rgba(114,254,143,0.4)] accent-glow';
+        const pctColor = isBook ? 'text-cyan-400' : 'text-primary accent-text';
+        const unitLabel = isBook ? 'Pág' : 'Aula';
+        const sc = statusColors[item.status] || statusColors.to_do;
+        return `
+            <div class="min-w-[240px] bg-surface-container-highest rounded-3xl p-5 border border-white/5 space-y-5 flex flex-col relative cursor-pointer active:scale-95 transition-transform" onclick="window.openLibraryView('${item.id}')">
+                <div class="flex justify-between items-start">
+                    <span class="text-3xl">${item.emoji || (isBook ? '📘' : '🎓')}</span>
+                    <span class="text-[8px] font-bold ${sc} px-2 py-1 rounded-lg uppercase tracking-widest border">${statusLabels[item.status] || 'Para Iniciar'}</span>
+                </div>
+                <div>
+                    <h4 class="font-bold text-[var(--text-primary)] text-base leading-tight">${item.title}</h4>
+                    <span class="text-[10px] text-on-surface-variant/50">${item.author || ''}</span>
+                </div>
+                <div class="space-y-3 mt-auto">
+                    <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
+                        <div class="h-full ${barColor} rounded-full" style="width:${pct}%"></div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-medium text-on-surface-variant">${unitLabel} ${item.current || 0} / ${item.total || 0}</span>
+                        <span class="text-[10px] font-extrabold ${pctColor}">${pct}%</span>
+                    </div>
+                </div>
+            </div>`;
+    };
+
+    const courses = (libraryItems || []).filter(i => i.type === 'course');
+    const books = (libraryItems || []).filter(i => i.type === 'book');
+    const emptyCard = (label) => `<div class="min-w-[240px] bg-surface-container rounded-3xl p-5 border border-dashed border-white/10 flex items-center justify-center"><span class="text-sm text-on-surface-variant/30">Nenhum ${label} cadastrado</span></div>`;
+
     // Helper for generating progress rings
     const generateRing = (dayToken, state, percent) => {
         if (state === 'future') {
@@ -117,59 +153,25 @@ export function getDashboardHTML({
                 </div>
             </section>
 
-            <!-- Learning Carousel Block -->
+            <!-- Learning Section — Cursos -->
             <section class="space-y-4">
                 <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-bold tracking-tight text-[var(--text-primary)] font-headline">Continuar de onde parou</h3>
-                    <span class="text-xs font-bold text-primary accent-text tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity" onclick="window.openLibraryModal()">Ver Todos</span>
+                    <h3 class="text-lg font-bold tracking-tight text-[var(--text-primary)] font-headline">Meus Cursos</h3>
+                    <span class="text-xs font-bold text-primary accent-text tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity" onclick="window.openLibraryModal('course')">Ver Todos</span>
                 </div>
-                <!-- Hide scrollbar class is added dynamically or via css -->
                 <div class="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-4" style="scrollbar-width: none; -ms-overflow-style: none;">
-                    
-                    <!-- Course Card -->
-                    <div class="min-w-[240px] bg-surface-container-highest rounded-3xl p-5 border border-white/5 space-y-5 flex flex-col relative">
-                        <div class="flex justify-between items-start">
-                            <span class="text-3xl">🎓</span>
-                            <span class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest bg-surface-container px-2 py-1 rounded">Curso</span>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-[var(--text-primary)] text-base leading-tight">UI Design Avançado</h4>
-                        </div>
-                        <div class="space-y-3 mt-auto">
-                            <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                                <div class="h-full bg-primary accent-bg w-3/4 rounded-full shadow-[0_0_8px_rgba(114,254,143,0.4)] accent-glow"></div>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-medium text-on-surface-variant">Aula 12 / 50</span>
-                                <button class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-primary accent-text active:scale-90 transition-transform">
-                                    <span class="material-symbols-outlined text-lg">add</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    ${courses.length > 0 ? courses.map(renderLibCard).join('') : emptyCard('curso')}
+                </div>
+            </section>
 
-                    <!-- Book Card -->
-                    <div class="min-w-[240px] bg-surface-container-highest rounded-3xl p-5 border border-white/5 space-y-5 flex flex-col relative">
-                        <div class="flex justify-between items-start">
-                            <span class="text-3xl">📘</span>
-                            <span class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest bg-surface-container px-2 py-1 rounded">Livro</span>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-[var(--text-primary)] text-base leading-tight">Hábitos Atômicos</h4>
-                        </div>
-                        <div class="space-y-3 mt-auto">
-                            <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                                <div class="h-full bg-cyan-400 w-[42%] rounded-full shadow-[0_0_8px_rgba(136,235,255,0.4)]"></div>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-medium text-on-surface-variant">Pág 45 / 300</span>
-                                <button class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-cyan-400 active:scale-90 transition-transform">
-                                    <span class="material-symbols-outlined text-lg">add</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
+            <!-- Learning Section — Livros -->
+            <section class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold tracking-tight text-[var(--text-primary)] font-headline">Meus Livros</h3>
+                    <span class="text-xs font-bold text-cyan-400 tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity" onclick="window.openLibraryModal('book')">Ver Todos</span>
+                </div>
+                <div class="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-4" style="scrollbar-width: none; -ms-overflow-style: none;">
+                    ${books.length > 0 ? books.map(renderLibCard).join('') : emptyCard('livro')}
                 </div>
             </section>
         </div>
@@ -346,6 +348,37 @@ export function getDashboardHTML({
             </div>
         </div>
 
+        <!-- Library VIEW Modal (bottom sheet, read-only) -->
+        <div id="library-view-modal" class="fixed inset-0 z-[200] hidden flex-col justify-end">
+            <div class="absolute inset-0 bg-[#000000]/80 backdrop-blur-md transition-opacity opacity-0 duration-500" id="library-view-overlay" onclick="window.closeLibraryView()"></div>
+            <div class="relative w-full h-[80vh] bg-surface-container-low rounded-t-[40px] flex flex-col shadow-[0_-20px_40px_rgba(0,0,0,0.5)] transform translate-y-full transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]" id="library-view-sheet">
+                <!-- Handle + Header -->
+                <div class="px-8 py-5 border-b border-white/5 flex flex-col gap-4">
+                    <div class="w-12 h-[5px] bg-surface-highest rounded-full mx-auto mb-1"></div>
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center gap-3">
+                            <span class="text-4xl" id="lbl-lv-emoji">📘</span>
+                            <div>
+                                <h2 class="text-2xl font-extrabold text-[var(--text-primary)] font-headline tracking-tight leading-tight" id="lbl-lv-title">Título</h2>
+                                <span id="lbl-lv-author" class="text-[11px] font-bold text-on-surface-variant/50">Autor</span>
+                            </div>
+                        </div>
+                        <button class="w-10 h-10 rounded-full bg-surface-highest flex items-center justify-center text-on-surface-variant hover:text-[var(--text-primary)] transition-colors active:scale-95" onclick="window.closeLibraryView()">
+                            <span class="material-symbols-outlined font-bold">close</span>
+                        </button>
+                    </div>
+                </div>
+                <!-- Content -->
+                <div class="flex-1 overflow-y-auto px-6 py-6 pb-28 space-y-4 hide-scrollbar" id="library-view-content"></div>
+                <!-- Footer -->
+                <div class="absolute bottom-0 left-0 w-full px-6 pt-10 pb-6 bg-gradient-to-t from-surface-container-low via-surface-container-low to-transparent" style="padding-bottom: env(safe-area-inset-bottom, 24px);">
+                    <button class="w-full h-16 rounded-[24px] bg-primary accent-bg text-black font-extrabold text-lg shadow-[0_10px_30px_rgba(var(--accent-color-rgb),0.3)] hover:scale-[1.02] active:scale-95 transition-transform flex items-center justify-center gap-2" onclick="window.openLibraryEditFromView()">
+                        <span class="material-symbols-outlined">edit</span> Editar Obra
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Library List Modal -->
         <div id="library-modal" class="fixed inset-0 z-[200] hidden flex-col justify-end">
             <div class="absolute inset-0 bg-[#000000]/80 backdrop-blur-md transition-opacity opacity-0 duration-500" id="library-modal-overlay" onclick="window.closeLibraryModal()"></div>
@@ -363,30 +396,50 @@ export function getDashboardHTML({
                             <span class="material-symbols-outlined font-bold">close</span>
                         </button>
                     </div>
+                    <!-- Filter tabs -->
+                    <div class="flex gap-2 pt-2">
+                        <button class="lib-filter-btn px-5 py-2 rounded-2xl font-bold text-xs transition-all active:scale-95" data-filter="all" onclick="window.filterLibrary('all')">Todos</button>
+                        <button class="lib-filter-btn px-5 py-2 rounded-2xl font-bold text-xs transition-all active:scale-95" data-filter="course" onclick="window.filterLibrary('course')">📚 Cursos</button>
+                        <button class="lib-filter-btn px-5 py-2 rounded-2xl font-bold text-xs transition-all active:scale-95" data-filter="book" onclick="window.filterLibrary('book')">📖 Livros</button>
+                    </div>
                 </div>
 
                 <!-- Scrollable List Area -->
                 <div class="flex-1 overflow-y-auto px-6 py-6 pb-32 space-y-4 hide-scrollbar" id="library-modal-list">
-                    <!-- Dinamicamente preenchido via JS (Mock UI Inicial Abaixo) -->
-                    <div class="w-full bg-surface-container-highest rounded-[28px] p-5 border border-white/5 space-y-5 flex flex-col relative group cursor-pointer active:scale-95 transition-transform shadow-lg" onclick="window.openLibraryForm('mock_1')">
-                        <div class="flex justify-between items-start">
-                            <span class="text-3xl filter drop-shadow-md">🎓</span>
-                            <span class="text-[10px] font-bold text-blue-400 bg-blue-400/10 px-3 py-1.5 rounded-xl uppercase tracking-widest border border-blue-400/20">Em Andamento</span>
-                        </div>
-                        <div>
-                            <span class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-1 block">Curso • Figma Master</span>
-                            <h4 class="font-bold text-[var(--text-primary)] text-[18px] leading-tight">UI Design Avançado</h4>
-                        </div>
-                        <div class="space-y-3 mt-auto">
-                            <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden border border-white/5">
-                                <div class="h-full bg-blue-400 w-[24%] rounded-full shadow-[0_0_10px_rgba(96,165,250,0.5)]"></div>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs font-bold text-on-surface-variant">Aula 12 de 50</span>
-                                <span class="text-xs font-extrabold text-blue-400">24%</span>
-                            </div>
-                        </div>
-                    </div>
+                    ${(libraryItems || []).length === 0 
+                        ? '<p class="text-center text-on-surface-variant/30 text-sm py-12">Nenhuma obra cadastrada ainda.</p>'
+                        : (libraryItems || []).map(item => {
+                            const pct = item.total > 0 ? Math.round((item.current / item.total) * 100) : 0;
+                            const isBook = item.type === 'book';
+                            const statusLabels = { to_do: 'Para Iniciar', in_progress: 'Em Andamento', done: 'Concluído' };
+                            const statusColors = { to_do: 'text-on-surface-variant/60 bg-white/5 border-white/10', in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20', done: 'text-green-400 bg-green-400/10 border-green-400/20' };
+                            const barColor = isBook ? 'bg-cyan-400 shadow-[0_0_10px_rgba(136,235,255,0.5)]' : 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]';
+                            const pctColor = isBook ? 'text-cyan-400' : 'text-blue-400';
+                            const unitLabel = isBook ? 'Pág' : 'Aula';
+                            const typeLabel = isBook ? 'Livro' : 'Curso';
+                            const sc = statusColors[item.status] || statusColors.to_do;
+                            return `
+                            <div class="w-full bg-surface-container-highest rounded-[28px] p-5 border border-white/5 space-y-5 flex flex-col relative cursor-pointer active:scale-[0.98] transition-transform shadow-lg" data-lib-type="${item.type}" onclick="window.openLibraryView('${item.id}')">
+                                <div class="flex justify-between items-start">
+                                    <span class="text-3xl filter drop-shadow-md">${item.emoji || (isBook ? '📘' : '🎓')}</span>
+                                    <span class="text-[10px] font-bold ${sc} px-3 py-1.5 rounded-xl uppercase tracking-widest border">${statusLabels[item.status] || 'Para Iniciar'}</span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest mb-1 block">${typeLabel} • ${item.author || ''}</span>
+                                    <h4 class="font-bold text-[var(--text-primary)] text-[18px] leading-tight">${item.title}</h4>
+                                </div>
+                                <div class="space-y-3 mt-auto">
+                                    <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden border border-white/5">
+                                        <div class="h-full ${barColor} rounded-full" style="width:${pct}%"></div>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-xs font-bold text-on-surface-variant">${unitLabel} ${item.current || 0} de ${item.total || 0}</span>
+                                        <span class="text-xs font-extrabold ${pctColor}">${pct}%</span>
+                                    </div>
+                                </div>
+                            </div>`;
+                        }).join('')
+                    }
                 </div>
 
                 <!-- Floating Bottom Button -->
@@ -400,7 +453,7 @@ export function getDashboardHTML({
 
         <!-- Library CRUD Form Modal (Overlays Library List) -->
         <div id="library-form-modal" class="fixed inset-0 z-[300] hidden flex-col justify-end">
-            <div class="absolute inset-0 bg-[#000000]/60 backdrop-blur-sm transition-opacity opacity-0 duration-300" id="library-form-overlay" onclick="window.closeLibraryForm()"></div>
+            <div class="absolute inset-0 bg-[#000000]/80 backdrop-blur-md transition-opacity opacity-0 duration-500" id="library-form-overlay" onclick="window.closeLibraryForm()"></div>
             
             <div class="relative w-full h-[90vh] bg-surface-container rounded-t-[40px] flex flex-col shadow-[0_-20px_50px_rgba(0,0,0,0.8)] transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]" id="library-form-sheet">
                 
@@ -487,7 +540,7 @@ export function getDashboardHTML({
 
                 <!-- Footer Action Buttons -->
                 <div class="absolute bottom-0 left-0 w-full px-6 pt-10 pb-6 bg-gradient-to-t from-surface-container via-surface-container to-transparent flex gap-4" style="padding-bottom: env(safe-area-inset-bottom, 24px);">
-                    <button class="w-16 h-16 rounded-[24px] bg-red-500/10 text-red-500 font-extrabold flex items-center justify-center border border-red-500/20 active:scale-95 transition-transform hidden" id="btn-lib-delete">
+                    <button class="w-16 h-16 rounded-[24px] bg-red-500/10 text-red-500 font-extrabold flex items-center justify-center border border-red-500/20 active:scale-95 transition-transform hidden" id="btn-lib-delete" onclick="window.deleteLibraryItem()">
                         <span class="material-symbols-outlined">delete_forever</span>
                     </button>
                     <button class="flex-1 h-16 rounded-[24px] bg-[var(--text-primary)] text-surface-highest font-extrabold text-lg shadow-xl active:scale-95 transition-transform cursor-pointer flex items-center justify-center gap-2" onclick="window.saveLibraryForm()">

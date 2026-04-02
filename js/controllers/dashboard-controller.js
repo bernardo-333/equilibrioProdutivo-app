@@ -18,6 +18,10 @@ export async function renderDashboard() {
     try {
         const todayLog = await DB.getTodayLog();
         const finances = await DB.getFinances();
+        const libraryItems = await DB.getLibrary();
+
+        // Store globally for view/edit lookups
+        window._libraryItems = libraryItems;
 
         // Calculate completion metrics
         let completedCheckins = 0;
@@ -41,18 +45,42 @@ export async function renderDashboard() {
         const missing = totalCheckins - completedCheckins;
         const isAllDone = completedCheckins === totalCheckins;
 
-        // MVP Mock of weekly data (Monday-Friday)
-        const weekData = [
-            { day: 'S', state: 'past', pct: 100 },
-            { day: 'T', state: 'past', pct: 33 },
-            { day: 'Q', state: 'today', pct: todayPct },
-            { day: 'Q', state: 'future', pct: 0 },
-            { day: 'S', state: 'future', pct: 0 }
-        ];
+        // Build weekly snap from real data (last 5 weekdays)
+        const dayNames = ['D','S','T','Q','Q','S','S'];
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const yearMonth = todayStr.substring(0, 7);
+        const monthLogs = await DB.getMonthlyLogs(yearMonth);
 
-        // Rule 4: Dynamic logic for Weekly Snap Message
+        // Find the current weekday position in Mon-Fri (0-4)
+        const todayDow = now.getDay(); // 0=Sun .. 6=Sat
+        // Build last 5 weekdays ending on today (or nearest weekday)
+        const weekDays = [];
+        const d = new Date(now);
+        // Go back to Monday of this week
+        const mondayOffset = todayDow === 0 ? -6 : -(todayDow - 1);
+        d.setDate(d.getDate() + mondayOffset);
+        for (let i = 0; i < 5; i++) {
+            const ds = d.toISOString().split('T')[0];
+            const log = monthLogs[ds];
+            let pct = 0;
+            if (log && log.habits) {
+                let c = 0;
+                for (const h of ALL_HABITS) { if (log.habits[h.id]) c++; }
+                if (log.sleep) c++;
+                if (log.mood) c++;
+                if ((log.water || 0) > 0) c++;
+                pct = Math.round((c / totalCheckins) * 100);
+            }
+            const state = ds === todayStr ? 'today' : (ds < todayStr ? 'past' : 'future');
+            weekDays.push({ day: dayNames[d.getDay()], state, pct });
+            d.setDate(d.getDate() + 1);
+        }
+        const weekData = weekDays;
+
+        // Dynamic snap message
         const perfectDaysCount = weekData.filter(d => d.pct === 100).length;
-        const isMonday = new Date().getDay() === 1;
+        const isMonday = now.getDay() === 1;
         const todayIdx = weekData.findIndex(d => d.state === 'today');
         
         let snapMessage = `${perfectDaysCount} dias perfeitos. <span class="text-primary accent-text">Não quebre a sequência hoje!</span>`;
@@ -69,7 +97,7 @@ export async function renderDashboard() {
 
         // Generate the dynamic view UI
         root.innerHTML = getDashboardHTML({ 
-            todayLog, finances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage 
+            todayLog, finances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
         });
 
         // Ensure dynamic dom texts are synced
@@ -121,7 +149,105 @@ window.closeCheckinModal = () => {
 
 // ----- LIBRARY SECTION LOGIC -----
 
-window.openLibraryModal = () => {
+let _viewingLibItem = null;
+
+// --- LIBRARY VIEW MODAL ---
+
+window.openLibraryView = (itemId) => {
+    const items = window._libraryItems || [];
+    const item = items.find(i => i.id === itemId) || { id: itemId, emoji:'📘', title:'', author:'', type:'book', status:'', current:0, total:0 };
+    _viewingLibItem = item;
+
+    document.getElementById('lbl-lv-emoji').innerText = item.emoji || '📘';
+    document.getElementById('lbl-lv-title').innerText = item.title || '';
+    document.getElementById('lbl-lv-author').innerText = item.author || '';
+
+    const pct = item.total > 0 ? Math.round((item.current / item.total) * 100) : 0;
+    const isBook = item.type === 'book';
+    const progressColor = isBook ? 'bg-cyan-400 shadow-[0_0_10px_rgba(136,235,255,0.5)]' : 'bg-primary accent-bg shadow-[0_0_10px_rgba(var(--accent-color-rgb),0.4)]';
+    const pctColor = isBook ? 'text-cyan-400' : 'text-primary accent-text';
+    const unitLabel = isBook ? 'Pág' : 'Aula';
+    const statusLabels = { to_do: 'Para Iniciar', in_progress: 'Em Andamento', done: 'Concluído' };
+    const statusColors = { to_do: 'text-on-surface-variant/60 border-white/10', in_progress: 'text-blue-400 border-blue-400/20 bg-blue-400/10', done: 'text-green-400 border-green-400/20 bg-green-400/10' };
+
+    const rows = [];
+    // Status + Type row
+    rows.push(`
+        <div class="flex gap-3">
+            <div class="flex-1 bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5">
+                <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block mb-1">Tipo</span>
+                <p class="font-bold text-[var(--text-primary)]">${isBook ? '📖 Livro' : '📚 Curso'}</p>
+            </div>
+            <div class="flex-1 bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5">
+                <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block mb-1">Status</span>
+                <span class="inline-block px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest ${statusColors[item.status] || ''}">${statusLabels[item.status] || '—'}</span>
+            </div>
+        </div>`);
+    // Progress
+    rows.push(`
+        <div class="bg-surface-container-highest rounded-3xl px-5 py-5 border border-white/5 space-y-3">
+            <div class="flex justify-between items-center">
+                <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest">Progresso</span>
+                <span class="font-extrabold text-sm ${pctColor}">${pct}%</span>
+            </div>
+            <div class="h-2.5 w-full bg-surface-container rounded-full overflow-hidden border border-white/5">
+                <div class="h-full ${progressColor} rounded-full transition-all" style="width:${pct}%"></div>
+            </div>
+            <p class="text-xs font-bold text-on-surface-variant">${unitLabel} ${item.current} de ${item.total}</p>
+        </div>`);
+    // Genre
+    if (item.genre) rows.push(`
+        <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5">
+            <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block mb-1">Gênero</span>
+            <p class="font-bold text-[var(--text-primary)]">${item.genre}</p>
+        </div>`);
+    // Rating
+    if (item.rating) rows.push(`
+        <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5 flex items-center justify-between">
+            <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest">Sua Nota</span>
+            <span class="text-xl tracking-wide">${'⭐'.repeat(item.rating)}${'<span class="grayscale opacity-30">⭐</span>'.repeat(5 - item.rating)}</span>
+        </div>`);
+    // Review
+    if (item.review) rows.push(`
+        <div class="bg-surface-container-highest rounded-3xl px-5 py-4 border border-white/5 space-y-2">
+            <span class="text-[10px] uppercase font-bold text-on-surface-variant/50 tracking-widest block">Suas Notas</span>
+            <p class="text-[var(--text-primary)] text-sm leading-relaxed">${item.review}</p>
+        </div>`);
+
+    document.getElementById('library-view-content').innerHTML = rows.join('');
+
+    const modal = document.getElementById('library-view-modal');
+    const overlay = document.getElementById('library-view-overlay');
+    const sheet = document.getElementById('library-view-sheet');
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        sheet.classList.remove('translate-y-full');
+    });
+};
+
+window.closeLibraryView = () => {
+    const modal = document.getElementById('library-view-modal');
+    const overlay = document.getElementById('library-view-overlay');
+    const sheet = document.getElementById('library-view-sheet');
+    overlay.classList.add('opacity-0');
+    sheet.classList.add('translate-y-full');
+    setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 500);
+};
+
+window.openLibraryEditFromView = () => {
+    const item = _viewingLibItem;
+    window.closeLibraryView();
+    setTimeout(() => {
+        window.openLibraryForm(item?.id, item);
+    }, 200);
+};
+
+// --- LIBRARY LIST MODAL ---
+
+window.openLibraryModal = (initialFilter) => {
     const el = document.getElementById('library-modal');
     const overlay = document.getElementById('library-modal-overlay');
     const sheet = document.getElementById('library-modal-sheet');
@@ -133,6 +259,9 @@ window.openLibraryModal = () => {
         overlay.classList.remove('opacity-0');
         sheet.classList.remove('translate-y-full');
     });
+
+    // Apply initial filter
+    window.filterLibrary(initialFilter || 'all');
 };
 
 window.closeLibraryModal = () => {
@@ -148,7 +277,28 @@ window.closeLibraryModal = () => {
     }, 500);
 };
 
-window.openLibraryForm = (id = null) => {
+window.filterLibrary = (filter) => {
+    // Update tab buttons
+    document.querySelectorAll('.lib-filter-btn').forEach(btn => {
+        btn.classList.remove('bg-primary/20', 'text-primary', 'border', 'border-primary/30');
+        btn.classList.add('bg-surface-highest', 'text-on-surface-variant', 'border', 'border-white/10');
+    });
+    const activeBtn = document.querySelector(`.lib-filter-btn[data-filter="${filter}"]`);
+    if (activeBtn) {
+        activeBtn.classList.remove('bg-surface-highest', 'text-on-surface-variant', 'border-white/10');
+        activeBtn.classList.add('bg-primary/20', 'text-primary', 'border-primary/30');
+    }
+    // Filter list items
+    document.querySelectorAll('#library-modal-list > [data-lib-type]').forEach(el => {
+        if (filter === 'all' || el.dataset.libType === filter) {
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    });
+};
+
+window.openLibraryForm = (id = null, itemData = null) => {
     const el = document.getElementById('library-form-modal');
     const overlay = document.getElementById('library-form-overlay');
     const sheet = document.getElementById('library-form-sheet');
@@ -157,26 +307,36 @@ window.openLibraryForm = (id = null) => {
 
     // Default to 'course' UI state
     window.setLibraryType('course');
-    window.setLibraryRating(0); // Clear stars
+    window.setLibraryRating(0);
     
-    // Simulate setting 'in_progress' by default
     const progBtn = document.querySelector('.lib-status-btn[data-val="in_progress"]');
     if (progBtn) window.setLibraryStatus(progBtn);
 
-    if (id && id.startsWith('mock_')) {
+    if (id && itemData) {
+        // EDIT mode with real data from view
+        window._editingLibId = id;
         title.innerText = 'Editar Obra';
-        btnDel.classList.remove('hidden'); // Show delete button
-        // Fake populate logic for MVP UI
-        document.getElementById('lib-emoji').value = '🎓';
-        document.getElementById('lib-title').value = 'UI Design Avançado';
-        document.getElementById('lib-author').value = 'Figma Master';
-        document.getElementById('lib-current').value = '12';
-        document.getElementById('lib-total').value = '50';
-        window.setLibraryRating(5);
+        btnDel.classList.remove('hidden');
+
+        document.getElementById('lib-emoji').value = itemData.emoji || '';
+        document.getElementById('lib-title').value = itemData.title || '';
+        document.getElementById('lib-author').value = itemData.author || '';
+        document.getElementById('lib-current').value = itemData.current || '';
+        document.getElementById('lib-total').value = itemData.total || '';
+        document.getElementById('lib-genre').value = itemData.genre || '';
+        document.getElementById('lib-review').value = itemData.review || '';
+
+        window.setLibraryType(itemData.type === 'book' ? 'book' : 'course');
+        window.setLibraryRating(itemData.rating || 0);
+
+        if (itemData.status) {
+            const statusBtn = document.querySelector(`.lib-status-btn[data-val="${itemData.status}"]`);
+            if (statusBtn) window.setLibraryStatus(statusBtn);
+        }
     } else {
+        window._editingLibId = null;
         title.innerText = 'Nova Obra';
         btnDel.classList.add('hidden');
-        // Clear inputs
         document.querySelectorAll('#library-form-sheet input, #library-form-sheet textarea').forEach(inp => inp.value = '');
     }
 
@@ -252,12 +412,45 @@ window.setLibraryRating = (score) => {
     });
 };
 
-window.saveLibraryForm = () => {
-    // Fake UX trigger. Closes Form Modal returning users to Library List UI feeling accomplished.
+window.saveLibraryForm = async () => {
+    const title = document.getElementById('lib-title').value.trim();
+    if (!title) { document.getElementById('lib-title').focus(); return; }
+
+    const isBook = document.getElementById('btn-type-book')?.classList.contains('text-primary');
+    const statusBtn = document.querySelector('.lib-status-btn.text-blue-400, .lib-status-btn.text-primary, .lib-status-btn.text-white');
+    const stars = document.querySelectorAll('.lib-star');
+    let rating = 0;
+    stars.forEach((s, i) => { if (!s.classList.contains('grayscale')) rating = i + 1; });
+
+    const item = {
+        id: window._editingLibId || Date.now().toString(),
+        emoji: document.getElementById('lib-emoji').value || (isBook ? '📘' : '🎓'),
+        title,
+        author: document.getElementById('lib-author').value.trim(),
+        type: isBook ? 'book' : 'course',
+        status: statusBtn?.dataset.val || 'to_do',
+        current: parseInt(document.getElementById('lib-current').value) || 0,
+        total: parseInt(document.getElementById('lib-total').value) || 0,
+        genre: document.getElementById('lib-genre').value.trim(),
+        rating,
+        review: document.getElementById('lib-review').value.trim()
+    };
+
+    await DB.saveLibraryItem(item);
     window.closeLibraryForm();
+    setTimeout(() => renderDashboard(), 400);
 };
 
-window.setWaterInput = (liters) => {
+window.deleteLibraryItem = async () => {
+    if (window._editingLibId && confirm('Tem certeza que deseja excluir esta obra?')) {
+        await DB.deleteLibraryItem(window._editingLibId);
+        window.closeLibraryForm();
+        setTimeout(() => renderDashboard(), 400);
+    }
+};
+
+window.setWaterInput = async (liters) => {
+    await DB.updateDailyMetrics('water', liters);
     for (let i = 1; i <= 5; i++) {
         const drop = document.getElementById(`water-drop-${i}`);
         if(drop) {
