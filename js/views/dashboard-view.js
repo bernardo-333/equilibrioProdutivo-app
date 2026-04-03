@@ -210,13 +210,18 @@ export function getDashboardHTML({
                             <div class="space-y-3">
                                 <span class="text-sm font-bold text-[var(--text-primary)] block">Humor Geral</span>
                                 <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width: none;">
-                                    <button onclick="window.selectChip(this, 'mood-btn')" data-active-class="border-red-500 bg-red-500/20 text-red-500" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Nervoso</button>
-                                    <button onclick="window.selectChip(this, 'mood-btn')" data-active-class="border-green-400 bg-green-400/20 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Feliz</button>
-                                    <button onclick="window.selectChip(this, 'mood-btn')" data-active-class="border-cyan-400 bg-cyan-400/20 text-cyan-400" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Produtivo</button>
-                                    <button onclick="window.selectChip(this, 'mood-btn')" data-active-class="border-white/50 bg-white/10 text-white" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Normal</button>
-                                    <button onclick="window.selectChip(this, 'mood-btn')" data-active-class="border-orange-400 bg-orange-400/20 text-orange-400" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Ansioso</button>
-                                    <button onclick="window.selectChip(this, 'mood-btn')" data-active-class="border-purple-400 bg-purple-400/20 text-purple-400" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Cansado</button>
-                                    <button onclick="window.selectChip(this, 'mood-btn')" data-active-class="border-blue-400 bg-blue-400/20 text-blue-400" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Triste</button>
+                                    ${[
+                                        { label: 'Nervoso', val: 'nervoso', active: 'border-red-500 bg-red-500/20 text-red-500' },
+                                        { label: 'Feliz', val: 'feliz', active: 'border-green-400 bg-green-400/20 text-green-400 shadow-[0_0_15px_rgba(74,222,128,0.3)]' },
+                                        { label: 'Produtivo', val: 'produtivo', active: 'border-cyan-400 bg-cyan-400/20 text-cyan-400' },
+                                        { label: 'Normal', val: 'normal', active: 'border-white/50 bg-white/10 text-white' },
+                                        { label: 'Ansioso', val: 'ansioso', active: 'border-orange-400 bg-orange-400/20 text-orange-400' },
+                                        { label: 'Cansado', val: 'cansado', active: 'border-purple-400 bg-purple-400/20 text-purple-400' },
+                                        { label: 'Triste', val: 'triste', active: 'border-blue-400 bg-blue-400/20 text-blue-400' }
+                                    ].map(m => {
+                                        const isActive = todayLog.mood === m.val;
+                                        return `<button onclick="window.selectChip(this, 'mood-btn')" data-active-class="${m.active}" class="mood-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border ${isActive ? m.active + ' opacity-100' : 'border-transparent bg-surface-highest text-on-surface-variant opacity-60'} text-sm font-bold hover:opacity-100 transition-all">${m.label}</button>`;
+                                    }).join('')}
                                 </div>
                             </div>
                             
@@ -226,11 +231,16 @@ export function getDashboardHTML({
                             <div class="space-y-3">
                                 <span class="text-sm font-bold text-[var(--text-primary)] block">Qualidade do Sono</span>
                                 <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width: none;">
-                                    <button onclick="window.selectChip(this, 'sleep-btn')" data-active-class="border-purple-400 bg-purple-400/20 text-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.3)]" class="sleep-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Perfeito</button>
-                                    <button onclick="window.selectChip(this, 'sleep-btn')" data-active-class="border-blue-400 bg-blue-400/20 text-blue-400" class="sleep-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Muito bom</button>
-                                    <button onclick="window.selectChip(this, 'sleep-btn')" data-active-class="border-cyan-400 bg-cyan-400/20 text-cyan-400" class="sleep-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Bom</button>
-                                    <button onclick="window.selectChip(this, 'sleep-btn')" data-active-class="border-orange-400 bg-orange-400/20 text-orange-400" class="sleep-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Mais ou menos</button>
-                                    <button onclick="window.selectChip(this, 'sleep-btn')" data-active-class="border-red-500 bg-red-500/20 text-red-500" class="sleep-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border border-transparent bg-surface-highest text-on-surface-variant text-sm font-bold opacity-60 hover:opacity-100 transition-all">Ruim</button>
+                                    ${[
+                                        { label: 'Perfeito', val: 'perfeito', active: 'border-purple-400 bg-purple-400/20 text-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.3)]' },
+                                        { label: 'Muito bom', val: 'muito_bom', active: 'border-blue-400 bg-blue-400/20 text-blue-400' },
+                                        { label: 'Bom', val: 'bom', active: 'border-cyan-400 bg-cyan-400/20 text-cyan-400' },
+                                        { label: 'Mais ou menos', val: 'mais_ou_menos', active: 'border-orange-400 bg-orange-400/20 text-orange-400' },
+                                        { label: 'Ruim', val: 'ruim', active: 'border-red-500 bg-red-500/20 text-red-500' }
+                                    ].map(s => {
+                                        const isActive = todayLog.sleep === s.val;
+                                        return `<button onclick="window.selectChip(this, 'sleep-btn')" data-active-class="${s.active}" class="sleep-btn flex-shrink-0 px-5 py-2.5 rounded-2xl border ${isActive ? s.active + ' opacity-100' : 'border-transparent bg-surface-highest text-on-surface-variant opacity-60'} text-sm font-bold hover:opacity-100 transition-all">${s.label}</button>`;
+                                    }).join('')}
                                 </div>
                             </div>
                         </div>
@@ -240,25 +250,24 @@ export function getDashboardHTML({
                     <section class="space-y-4">
                         <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Seu corpo e tempo</h3>
                         <div class="grid grid-cols-2 gap-4">
-                            <!-- Acordei as -->
+                            <!-- Tempo de Tela -->
                             <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
-                                <span class="text-xs font-bold text-on-surface-variant px-1">Acordei às</span>
-                                <input type="time" value="06:30" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">
+                                <span class="text-xs font-bold text-on-surface-variant px-1">Tempo de Tela</span>
+                                <input id="input-screen-time" type="time" value="${todayLog.screen_time || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">
                             </div>
                             <!-- Instagram -->
                             <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
                                 <span class="text-xs font-bold text-on-surface-variant px-1">Instagram</span>
-                                <input type="time" value="01:30" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">
+                                <input id="input-instagram" type="time" value="${todayLog.instagram || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">
                             </div>
                             <!-- Água -->
                             <div class="col-span-2 bg-surface-container rounded-3xl p-5 border border-white/5 space-y-4 flex flex-col items-center justify-center">
                                 <span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest text-center">Água Consumida (1 Gota = 1 Litro)</span>
                                 <div class="flex items-center gap-3">
-                                    <button onclick="window.setWaterInput(1)" id="water-drop-1" class="text-4xl transition-all duration-300 drop-shadow-[0_0_15px_rgba(34,211,238,0.6)] filter-none hover:scale-110 active:scale-90">💧</button>
-                                    <button onclick="window.setWaterInput(2)" id="water-drop-2" class="text-4xl transition-all duration-300 drop-shadow-[0_0_15px_rgba(34,211,238,0.6)] filter-none hover:scale-110 active:scale-90">💧</button>
-                                    <button onclick="window.setWaterInput(3)" id="water-drop-3" class="text-4xl transition-all duration-300 drop-shadow-[0_0_15px_rgba(34,211,238,0.6)] filter-none hover:scale-110 active:scale-90">💧</button>
-                                    <button onclick="window.setWaterInput(4)" id="water-drop-4" class="text-4xl transition-all duration-300 grayscale opacity-30 hover:scale-110 active:scale-90">💧</button>
-                                    <button onclick="window.setWaterInput(5)" id="water-drop-5" class="text-4xl transition-all duration-300 grayscale opacity-30 hover:scale-110 active:scale-90">💧</button>
+                                    ${[1,2,3,4,5].map(i => {
+                                        const isActive = i <= (todayLog.water || 0);
+                                        return `<button onclick="window.setWaterInput(${i})" id="water-drop-${i}" class="text-4xl transition-all duration-300 ${isActive ? 'drop-shadow-[0_0_15px_rgba(34,211,238,0.6)] filter-none' : 'grayscale opacity-30'} hover:scale-110 active:scale-90">💧</button>`;
+                                    }).join('')}
                                 </div>
                             </div>
                         </div>

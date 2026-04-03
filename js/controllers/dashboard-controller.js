@@ -108,7 +108,7 @@ export async function renderDashboard() {
     }
 }
 
-window.openCheckinModal = () => {
+window.openCheckinModal = async () => {
     const el = document.getElementById('checkin-modal');
     const overlay = document.getElementById('checkin-modal-overlay');
     const sheet = document.getElementById('checkin-modal-sheet');
@@ -123,6 +123,50 @@ window.openCheckinModal = () => {
     const lblDay = document.getElementById('lbl-checkin-day');
     if (lblDate) lblDate.textContent = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.','').toUpperCase();
     if (lblDay) lblDay.textContent = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
+
+    // Pre-select saved mood/sleep/water/screen_time/instagram
+    const todayLog = await DB.getTodayLog();
+
+    // Mood chips
+    const moodMap = { nervoso: 'Nervoso', feliz: 'Feliz', produtivo: 'Produtivo', normal: 'Normal', ansioso: 'Ansioso', cansado: 'Cansado', triste: 'Triste' };
+    if (todayLog.mood) {
+        const label = moodMap[todayLog.mood];
+        document.querySelectorAll('.mood-btn').forEach(btn => {
+            if (btn.textContent.trim() === label) window.selectChip(btn, 'mood-btn', true);
+        });
+    }
+
+    // Sleep chips
+    const sleepMap = { perfeito: 'Perfeito', muito_bom: 'Muito bom', bom: 'Bom', mais_ou_menos: 'Mais ou menos', ruim: 'Ruim' };
+    if (todayLog.sleep) {
+        const label = sleepMap[todayLog.sleep];
+        document.querySelectorAll('.sleep-btn').forEach(btn => {
+            if (btn.textContent.trim() === label) window.selectChip(btn, 'sleep-btn', true);
+        });
+    }
+
+    // Water drops
+    const savedWater = todayLog.water || 0;
+    if (savedWater > 0) {
+        for (let i = 1; i <= 5; i++) {
+            const drop = document.getElementById(`water-drop-${i}`);
+            if (drop) {
+                if (i <= savedWater) {
+                    drop.classList.remove('grayscale', 'opacity-30');
+                    drop.classList.add('drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]', 'filter-none');
+                } else {
+                    drop.classList.add('grayscale', 'opacity-30');
+                    drop.classList.remove('drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]', 'filter-none');
+                }
+            }
+        }
+    }
+
+    // Screen time inputs
+    const screenInput = document.getElementById('input-screen-time');
+    const instagramInput = document.getElementById('input-instagram');
+    if (screenInput) screenInput.value = todayLog.screen_time || '';
+    if (instagramInput) instagramInput.value = todayLog.instagram || '';
     
     // Trigger animations smooth slide up
     requestAnimationFrame(() => {
@@ -131,7 +175,17 @@ window.openCheckinModal = () => {
     });
 };
 
-window.closeCheckinModal = () => {
+window.closeCheckinModal = async () => {
+    // Save screen_time and instagram before closing
+    const screenInput = document.getElementById('input-screen-time');
+    const instagramInput = document.getElementById('input-instagram');
+    if (screenInput && screenInput.value) {
+        await DB.updateDailyMetrics('screen_time', screenInput.value);
+    }
+    if (instagramInput && instagramInput.value) {
+        await DB.updateDailyMetrics('instagram', instagramInput.value);
+    }
+
     const el = document.getElementById('checkin-modal');
     const overlay = document.getElementById('checkin-modal-overlay');
     const sheet = document.getElementById('checkin-modal-sheet');
@@ -465,7 +519,11 @@ window.setWaterInput = async (liters) => {
     }
 };
 
-window.selectChip = (element, groupClass) => {
+window.selectChip = (element, groupClass, silent = false) => {
+    // Map button text to DB values
+    const moodValues = { 'Nervoso': 'nervoso', 'Feliz': 'feliz', 'Produtivo': 'produtivo', 'Normal': 'normal', 'Ansioso': 'ansioso', 'Cansado': 'cansado', 'Triste': 'triste' };
+    const sleepValues = { 'Perfeito': 'perfeito', 'Muito bom': 'muito_bom', 'Bom': 'bom', 'Mais ou menos': 'mais_ou_menos', 'Ruim': 'ruim' };
+
     // Reset all buttons in this specific group to inactive state
     document.querySelectorAll(`.${groupClass}`).forEach(btn => {
         const activeClasses = btn.getAttribute('data-active-class').split(' ');
@@ -477,6 +535,18 @@ window.selectChip = (element, groupClass) => {
     const activeClasses = element.getAttribute('data-active-class').split(' ');
     element.classList.remove('border-transparent', 'bg-surface-highest', 'text-on-surface-variant', 'opacity-60');
     element.classList.add(...activeClasses, 'opacity-100');
+
+    // Save to DB (unless silent pre-selection)
+    if (!silent) {
+        const text = element.textContent.trim();
+        if (groupClass === 'mood-btn' && moodValues[text]) {
+            DB.updateDailyMetrics('mood', moodValues[text]);
+            recalculateProgress();
+        } else if (groupClass === 'sleep-btn' && sleepValues[text]) {
+            DB.updateDailyMetrics('sleep', sleepValues[text]);
+            recalculateProgress();
+        }
+    }
 };
 
 window.toggleHabit = async (habitId, isCompleted) => {

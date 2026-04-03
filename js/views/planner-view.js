@@ -64,7 +64,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                 <div class="flex items-center justify-between mb-5 px-1">
                     <div>
                         <h3 class="text-xl font-extrabold text-[var(--text-primary)] font-headline tracking-tighter leading-none">Consistência</h3>
-                        <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60 mt-0.5 block">Abril 2026</span>
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60 mt-0.5 block">${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][now.getMonth()]} ${now.getFullYear()}</span>
                     </div>
                     <div class="w-10 h-10 rounded-2xl bg-primary/10 accent-bg/10 flex items-center justify-center">
                         <span class="material-symbols-outlined text-primary accent-text text-xl">calendar_month</span>

@@ -12,9 +12,27 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBIlCbxhxEucKdBNyMWEwRuFOpEo0dVQx8",
+  authDomain: "equilibrioprodutivo-app.firebaseapp.com",
+  databaseURL: "https://equilibrioprodutivo-app-default-rtdb.firebaseio.com",
+  projectId: "equilibrioprodutivo-app",
+  storageBucket: "equilibrioprodutivo-app.firebasestorage.app",
+  messagingSenderId: "785521986199",
+  appId: "1:785521986199:web:449d7fe7979e0aad8db7d2",
+  measurementId: "G-2FZ69XYWZJ"
+};
+
+// Initialize Firebase
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
 // App Initialization
 class App {
-    constructor() {
+    constructor(user) {
+        this.user = user;
         this.currentTab = 'tab-dashboard';
         this.initNavigation();
         this.loadSettings();
@@ -28,7 +46,19 @@ class App {
         dateStr = dateStr.replace('.', '').replace(' de ', ' ').replace('.', '');
         document.getElementById('header-date').textContent = dateStr;
 
+        // Update user avatar in header
+        const avatar = document.getElementById('user-avatar');
+        if (avatar && this.user.photoURL) {
+             avatar.innerHTML = `<img src="${this.user.photoURL}" alt="User Avatar" class="w-full h-full object-cover">`;
+        }
+
         this.initScrollHeader();
+    }
+
+    async signOut() {
+        if(confirm('Tem certeza que deseja sair da sua conta?')) {
+            await firebase.auth().signOut();
+        }
     }
 
     initScrollHeader() {
@@ -110,7 +140,70 @@ class App {
     }
 }
 
-// Start App when DOM is loaded
+// Auth Lifecycle & UI State
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new App();
+    const authScreen = document.getElementById('auth-screen');
+    const authLoading = document.getElementById('auth-loading');
+    const authLoginBox = document.getElementById('auth-login-box');
+    const btnGoogle = document.getElementById('btn-login-google');
+    
+    const appContainer = document.getElementById('app-container');
+    const mainHeader = document.getElementById('main-header');
+    const bottomNav = document.getElementById('bottom-nav');
+
+    btnGoogle.addEventListener('click', async () => {
+        try {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            await firebase.auth().signInWithPopup(provider);
+        } catch (error) {
+            console.error("Erro no login com google:", error);
+            alert("Erro ao realizar login. Tente novamente.");
+        }
+    });
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            // Logged in
+            console.log("User in:", user.uid);
+            
+            // Pass UID to database
+            DB.init(user.uid);
+
+            // Hide auth screen, show app UI
+            authScreen.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                authScreen.classList.add('hidden');
+                
+                // Show Main App
+                appContainer.classList.remove('opacity-0', 'pointer-events-none');
+                mainHeader.classList.remove('opacity-0', 'pointer-events-none');
+                
+                bottomNav.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-full');
+                document.body.classList.remove('overflow-hidden');
+                
+                if (!window.app) {
+                    window.app = new App(user);
+                } else {
+                    window.app.renderTab(window.app.currentTab);
+                }
+
+            }, 500);
+
+        } else {
+            // Not logged in
+            console.log("No user");
+            
+            // Show auth blocks
+            authScreen.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+            authLoading.classList.add('hidden');
+            authLoginBox.classList.remove('hidden');
+
+            // Hide App UI
+            appContainer.classList.add('opacity-0', 'pointer-events-none');
+            mainHeader.classList.add('opacity-0', 'pointer-events-none');
+            bottomNav.classList.add('opacity-0', 'pointer-events-none', 'translate-y-full');
+            
+            window.app = null;
+        }
+    });
 });

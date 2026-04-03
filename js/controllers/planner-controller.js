@@ -103,8 +103,8 @@ export async function renderPlanner() {
         perfectDays,
         avgSleep,
         avgMood,
-        totalGastoDia: finances.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
-        totalGastoDinheiro: finances.balance
+        totalGastoDia: (finances.transactions || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+        totalGastoDinheiro: finances.balance || 0
     };
 
     root.innerHTML = getPlannerHTML({ calendarData, historyDays, metrics, kanbanData });

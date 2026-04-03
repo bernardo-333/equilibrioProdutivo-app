@@ -1,8 +1,7 @@
 /**
  * database.js
- * Abstraction layer for data storage.
- * MVP: localStorage. Fase 2: Firebase Realtime Database.
- * All methods return Promises for easy Firebase migration.
+ * Abstraction layer for data storage using Firebase Realtime Database (Fase 2)
+ * Includes a one-time migration from LocalStorage for seamless UX.
  */
 
 const STORAGE_KEY = 'equilibrio_produtivo_data';
@@ -13,7 +12,7 @@ const initialState = {
     transactions: [],
     balance: 0
   },
-  learning: [], // Array of { id, emoji, title, author, type, status, current, total, genre, rating, review }
+  learning: [],
   kanban: {
     ideas: [],
     doing: [],
@@ -24,12 +23,11 @@ const initialState = {
   }
 };
 
-function getDb() {
+function getLocalDb() {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) return JSON.parse(JSON.stringify(initialState));
   try {
     const parsed = JSON.parse(data);
-    // Ensure all keys exist (migration safety)
     return {
       daily_logs: parsed.daily_logs || {},
       finances: parsed.finances || { transactions: [], balance: 0 },
@@ -42,116 +40,145 @@ function getDb() {
   }
 }
 
-function saveDb(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 
 export const DB = {
+  _uid: null,
+
+  init: async (uid) => {
+    DB._uid = uid;
+    try {
+      const snap = await firebase.database().ref(`users/${uid}`).once('value');
+      if (!snap.exists()) {
+        const localData = getLocalDb();
+        await firebase.database().ref(`users/${uid}`).set(localData);
+        console.log('[DB] Migração do LocalStorage para o Firebase realizada com sucesso.');
+      } else {
+        console.log('[DB] Dados sincronizados a partir da nuvem.');
+      }
+    } catch(err) {
+      console.error('[DB] Erro de inicialização', err);
+    }
+  },
+
+  getRef: (path) => {
+      if(!DB._uid) throw new Error("Usuário não autenticado");
+      return firebase.database().ref(`users/${DB._uid}/${path}`);
+  },
 
   // -- Settings --
   getSettings: async () => {
-    return getDb().settings;
+    const snap = await DB.getRef('settings').once('value');
+    return snap.exists() ? snap.val() : { accent_color: '#72fe8f' };
   },
   saveSettings: async (settings) => {
-    const db = getDb();
-    db.settings = { ...db.settings, ...settings };
-    saveDb(db);
-    return db.settings;
+    const current = await DB.getSettings();
+    const updated = { ...current, ...settings };
+    await DB.getRef('settings').set(updated);
+    return updated;
   },
 
   // -- Daily Logs / Habits --
   getTodayLog: async () => {
     const today = getTodayStr();
-    const db = getDb();
-    if (!db.daily_logs[today]) {
-      db.daily_logs[today] = { habits: {}, mood: null, sleep: null, water: 0, screen_time: 0, instagram: 0 };
-      saveDb(db);
+    const snap = await DB.getRef(`daily_logs/${today}`).once('value');
+    if (!snap.exists()) {
+      const blank = { habits: {}, mood: null, sleep: null, water: 0, screen_time: 0, instagram: 0 };
+      await DB.getRef(`daily_logs/${today}`).set(blank);
+      return blank;
     }
-    return db.daily_logs[today];
+    return snap.val();
   },
 
   updateHabit: async (habitId, isCompleted) => {
     const today = getTodayStr();
-    const db = getDb();
-    if (!db.daily_logs[today]) db.daily_logs[today] = { habits: {}, mood: null, sleep: null, water: 0 };
-    db.daily_logs[today].habits[habitId] = isCompleted;
-    saveDb(db);
+    // Using update so we don't overwrite mood/sleep
+    await DB.getRef(`daily_logs/${today}/habits`).update({
+        [habitId]: isCompleted
+    });
   },
 
   updateDailyMetrics: async (metric, value) => {
     const today = getTodayStr();
-    const db = getDb();
-    if (!db.daily_logs[today]) db.daily_logs[today] = { habits: {}, mood: null, sleep: null, water: 0 };
-    db.daily_logs[today][metric] = value;
-    saveDb(db);
+    await DB.getRef(`daily_logs/${today}`).update({
+        [metric]: value
+    });
   },
 
   getMonthlyLogs: async (yearMonth) => {
-    const db = getDb();
-    const result = {};
-    for (const date in db.daily_logs) {
-      if (date.startsWith(yearMonth)) {
-        result[date] = db.daily_logs[date];
-      }
-    }
-    return result;
+    // Busca logs diários que começam com o ano/mês "YYYY-MM"
+    const snap = await DB.getRef('daily_logs').orderByKey().startAt(yearMonth).endAt(yearMonth + '\uf8ff').once('value');
+    return snap.exists() ? snap.val() : {};
   },
 
   getDailyLog: async (dateStr) => {
-    const db = getDb();
-    return db.daily_logs[dateStr] || null;
+    const snap = await DB.getRef(`daily_logs/${dateStr}`).once('value');
+    return snap.exists() ? snap.val() : null;
   },
 
   // -- Finance --
   getFinances: async () => {
-    return getDb().finances;
+    const snap = await DB.getRef('finances').once('value');
+    if(!snap.exists()) return { transactions: [], balance: 0 };
+    const val = snap.val();
+    return {
+        transactions: val.transactions || [],
+        balance: val.balance || 0
+    };
   },
 
   addTransaction: async (transaction) => {
-    const db = getDb();
     transaction.id = Date.now().toString();
-    db.finances.transactions.push(transaction);
-    if (transaction.type === 'income') db.finances.balance += Number(transaction.amount);
-    else db.finances.balance -= Number(transaction.amount);
-    saveDb(db);
+    const finances = await DB.getFinances();
+    if (!finances.transactions) finances.transactions = [];
+    
+    finances.transactions.push(transaction);
+    if (transaction.type === 'income') finances.balance += Number(transaction.amount);
+    else finances.balance -= Number(transaction.amount);
+    
+    await DB.getRef('finances').set(finances);
     return transaction;
   },
 
   // -- Library (Livros & Cursos) --
   getLibrary: async () => {
-    return getDb().learning;
+    const snap = await DB.getRef('learning').once('value');
+    return snap.exists() ? snap.val() : [];
   },
 
   saveLibraryItem: async (item) => {
-    const db = getDb();
-    if (!Array.isArray(db.learning)) db.learning = [];
+    let list = await DB.getLibrary();
+    if (!Array.isArray(list)) list = [];
 
-    const idx = db.learning.findIndex(i => i.id === item.id);
+    const idx = list.findIndex(i => i.id === item.id);
     if (idx >= 0) {
-      db.learning[idx] = item; // update
+      list[idx] = item; // update
     } else {
-      db.learning.push(item); // create
+      list.push(item); // create
     }
-    saveDb(db);
+    await DB.getRef('learning').set(list);
     return item;
   },
 
   deleteLibraryItem: async (itemId) => {
-    const db = getDb();
-    db.learning = (db.learning || []).filter(i => i.id !== itemId);
-    saveDb(db);
+    let list = await DB.getLibrary();
+    list = (list || []).filter(i => i.id !== itemId);
+    await DB.getRef('learning').set(list);
   },
 
   // -- Kanban --
   getKanbanData: async () => {
-    return getDb().kanban;
+    const snap = await DB.getRef('kanban').once('value');
+    if(!snap.exists()) return { ideas: [], doing: [], done: [] };
+    const val = snap.val();
+    return {
+        ideas: val.ideas || [],
+        doing: val.doing || [],
+        done: val.done || []
+    };
   },
 
   saveKanbanData: async (kanbanData) => {
-    const db = getDb();
-    db.kanban = kanbanData;
-    saveDb(db);
+    await DB.getRef('kanban').set(kanbanData);
   }
 };
