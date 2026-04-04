@@ -39,18 +39,25 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
 
     const calendarGridHTML = emptyOffsets + calendarData.map(d => {
         const isToday = d.day === now.getDate();
+        const canOpen = !!d.hasLog;
+        const isPerfectDay = d.level === 3 && d.pct === 100;
         let levelClasses = '';
         switch(d.level) {
             case 0: levelClasses = 'bg-white/[0.04]'; break;
             case 1: levelClasses = 'bg-primary/25 opacity-50'; break;
             case 2: levelClasses = 'bg-primary/55 opacity-90 shadow-[0_0_6px_var(--accent-color)]'; break;
-            case 3: levelClasses = 'bg-primary accent-bg shadow-[0_0_14px_var(--accent-color)]'; break;
+            case 3: levelClasses = isPerfectDay
+                ? 'bg-primary accent-bg ring-1 ring-white/65 shadow-[0_0_20px_var(--accent-color)]'
+                : 'bg-primary/70 border border-primary/45 shadow-[0_0_6px_var(--accent-color)]';
+                break;
             case 4: levelClasses = 'bg-amber-200/70 border border-amber-200/35'; break;
         }
         const todayRing = isToday ? 'ring-2 ring-primary/80 accent-border scale-105' : '';
-        const textColor = d.level === 4 ? 'text-amber-900/70' : d.level === 3 ? 'text-black/70' : d.level >= 2 ? 'text-white/70' : 'text-white/25';
-        const perfectMarker = d.level === 3 ? '<span class="absolute top-1 right-1 material-symbols-outlined text-[10px] text-black/65" style="font-variation-settings: \'FILL\' 1;">task_alt</span>' : '';
-        return `<div title="Dia ${d.day}" class="aspect-square w-full rounded-lg ${levelClasses} ${todayRing} relative flex items-center justify-center text-[9px] font-extrabold ${textColor} select-none transition-all duration-200 cursor-pointer hover:scale-110 hover:brightness-125">${d.day}${perfectMarker}</div>`;
+        const textColor = d.level === 4 ? 'text-amber-900/70' : isPerfectDay ? 'text-black/85' : d.level === 3 ? 'text-white/90' : d.level >= 2 ? 'text-white/70' : 'text-white/25';
+        const perfectMarker = isPerfectDay ? '<span class="absolute top-1 right-1 material-symbols-outlined text-[10px] text-black/75" style="font-variation-settings: \'FILL\' 1;">auto_awesome</span>' : '';
+        const interactions = canOpen ? 'cursor-pointer hover:scale-110 hover:brightness-125' : 'cursor-default';
+        const clickHandler = canOpen ? `onclick="window.openDailyDetail('${d.rawDate}')"` : '';
+        return `<div title="Dia ${d.day}" ${clickHandler} class="aspect-square w-full rounded-lg ${levelClasses} ${todayRing} relative flex items-center justify-center text-[9px] font-extrabold ${textColor} select-none transition-all duration-200 ${interactions}">${d.day}${perfectMarker}</div>`;
     }).join('');
 
     const initialRows = historyDays.slice(0, 6).map(day => getCompactRow(day)).join('');
@@ -90,9 +97,11 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                         <div class="w-4 h-4 rounded-sm bg-white/[0.04]"></div>
                         <div class="w-4 h-4 rounded-sm bg-primary/25 opacity-50"></div>
                         <div class="w-4 h-4 rounded-sm bg-primary/55 opacity-90"></div>
-                        <div class="w-4 h-4 rounded-sm bg-primary accent-bg relative"><span class="material-symbols-outlined text-[8px] text-black/70 absolute inset-0 flex items-center justify-center" style="font-variation-settings: 'FILL' 1;">task_alt</span></div>
+                        <div class="w-4 h-4 rounded-sm bg-primary/70 border border-primary/45"></div>
+                        <div class="w-4 h-4 rounded-sm bg-primary accent-bg ring-1 ring-white/70 relative"><span class="material-symbols-outlined text-[8px] text-black/75 absolute inset-0 flex items-center justify-center" style="font-variation-settings: 'FILL' 1;">auto_awesome</span></div>
                         <div class="w-4 h-4 rounded-sm bg-amber-300"></div>
                     </div>
+                    <span class="text-[9px] font-bold text-white/60 uppercase tracking-widest">67-99%</span>
                     <span class="text-[9px] font-bold text-primary accent-text uppercase tracking-widest">100%</span>
                     <span class="text-[9px] font-bold text-amber-300 uppercase tracking-widest">Descanso</span>
                 </div>

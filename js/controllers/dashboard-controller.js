@@ -591,7 +591,7 @@ window.selectChip = (element, groupClass, silent = false) => {
 window.toggleHabit = async (habitId, isCompleted) => {
     const restBtn = document.getElementById('rest-day-toggle-checkin');
     if (restBtn?.dataset.active === 'true') {
-        alert('Dia de descanso ativo. Desative para editar hábitos.');
+        window.showToast?.('Dia de descanso ativo. Desative para editar hábitos.', 'info');
         return;
     }
 
@@ -734,11 +734,3 @@ async function recalculateProgress() {
         }
     }
 }
-
-window.openFinanceModal = () => {
-    // Financeiro em modo futuro: sem acao por enquanto.
-};
-
-window.closeFinanceModal = () => {
-    // Financeiro em modo futuro: sem acao por enquanto.
-};

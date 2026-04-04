@@ -49,13 +49,14 @@ export async function renderPlanner() {
         const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
         const log = monthLogs[ds];
         const pct = calcDayPct(log);
+        const hasLog = !!log;
         const isRestDay = !!(log && log.rest_day);
         let level = 0;
         if (isRestDay) level = 4;
         else if (pct > 0 && pct <= 33) level = 1;
         else if (pct > 33 && pct <= 66) level = 2;
         else if (pct > 66) level = 3;
-        calendarData.push({ day: d, level, isFuture: d > todayDate, isRestDay });
+        calendarData.push({ day: d, level, pct, isFuture: d > todayDate, isRestDay, rawDate: ds, hasLog });
     }
 
     // History days (most recent first, only days with data)
@@ -371,7 +372,7 @@ window.openDailyDetail = (date, isEditMode = false) => {
 window.toggleHabitForDate = async (date, habitId, isCompleted) => {
     const day = window._plannerHistory.find(d => d.rawDate === date);
     if (day?.restDay) {
-        alert('Dia de descanso ativo. Desative para editar hábitos.');
+        window.showToast?.('Dia de descanso ativo. Desative para editar hábitos.', 'info');
         return;
     }
 

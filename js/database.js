@@ -52,9 +52,6 @@ export const DB = {
       if (!snap.exists()) {
         const localData = getLocalDb();
         await firebase.database().ref(`users/${uid}`).set(localData);
-        console.log('[DB] Migração do LocalStorage para o Firebase realizada com sucesso.');
-      } else {
-        console.log('[DB] Dados sincronizados a partir da nuvem.');
       }
     } catch(err) {
       console.error('[DB] Erro de inicialização', err);

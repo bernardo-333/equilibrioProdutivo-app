@@ -29,6 +29,34 @@ if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
+function ensureToastHost() {
+    let host = document.getElementById('app-toast-host');
+    if (!host) {
+        host = document.createElement('div');
+        host.id = 'app-toast-host';
+        host.className = 'app-toast-host';
+        document.body.appendChild(host);
+    }
+    return host;
+}
+
+window.showToast = (message, type = 'info') => {
+    const host = ensureToastHost();
+    const toast = document.createElement('div');
+    toast.className = `app-toast app-toast-${type}`;
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.textContent = message;
+
+    host.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 220);
+    }, 2400);
+};
+
 // App Initialization
 class App {
     constructor(user) {
@@ -62,10 +90,25 @@ class App {
         return 'Boa noite';
     }
 
-    updateDynamicGreeting() {
-        const greeting = this.getGreeting();
+    getGreetingMeta() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) {
+            return { text: 'Bom dia', icon: 'wb_sunny', iconClass: 'text-amber-300' };
+        }
+        if (hour >= 12 && hour < 18) {
+            return { text: 'Boa tarde', icon: 'partly_cloudy_day', iconClass: 'text-orange-300' };
+        }
+        return { text: 'Boa noite', icon: 'dark_mode', iconClass: 'text-blue-300' };
+    }
+
+    buildDashboardTitle() {
+        const greeting = this.getGreetingMeta();
         const firstName = this.user.displayName ? this.user.displayName.split(' ')[0] : 'Usuário';
-        const dynamicTitle = `<span class='text-xl accent-text'>${greeting}</span><br/>${firstName}`;
+        return `<span class='inline-flex items-center gap-1.5 text-xl accent-text'><span>${greeting.text}</span><span class='material-symbols-outlined ${greeting.iconClass}' style="font-size: 19px; font-variation-settings: 'FILL' 1;">${greeting.icon}</span></span><br/>${firstName}`;
+    }
+
+    updateDynamicGreeting() {
+        const dynamicTitle = this.buildDashboardTitle();
         
         if (this.currentTab === 'tab-dashboard') {
             document.getElementById('header-title').innerHTML = dynamicTitle;
@@ -113,9 +156,7 @@ class App {
                 let title = item.dataset.title;
                 
                 if (target === 'tab-dashboard') {
-                    const greeting = this.getGreeting();
-                    const firstName = this.user.displayName ? this.user.displayName.split(' ')[0] : 'Usuário';
-                    title = `<span class='text-xl accent-text'>${greeting}</span><br/>${firstName}`;
+                    title = this.buildDashboardTitle();
                 }
                 
                 if (target === this.currentTab) return; // already active
@@ -176,14 +217,13 @@ document.addEventListener('DOMContentLoaded', () => {
             await firebase.auth().signInWithPopup(provider);
         } catch (error) {
             console.error("Erro no login com google:", error);
-            alert("Erro ao realizar login. Tente novamente.");
+            window.showToast?.('Erro ao realizar login. Tente novamente.', 'error');
         }
     });
 
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             // Logged in
-            console.log("User in:", user.uid);
             
             // Pass UID to database
             DB.init(user.uid);
@@ -210,7 +250,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } else {
             // Not logged in
-            console.log("No user");
             
             // Show auth blocks
             authScreen.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
