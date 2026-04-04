@@ -13,6 +13,50 @@ const ALL_HABITS = [
     { id: 'fill_notion', name: 'Preencher Notion', icon: 'edit_note' }
 ];
 
+// Helper for dynamic local finances calculations
+function getFinanceMetrics(finances) {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    // Semanal: last 7 days 
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+
+    // Mensal: this month
+    const monthStr = todayStr.substring(0, 7);
+
+    let gastosHoje = 0, ganhosHoje = 0;
+    let gastosSemana = 0, ganhosSemana = 0;
+    let gastosMes = 0, ganhosMes = 0;
+
+    for (const t of (finances.transactions || [])) {
+        const amt = Number(t.amount || 0);
+        const d = (t.date || '').substring(0, 10);
+        
+        if (d === todayStr) {
+            if (t.type === 'expense') gastosHoje += amt;
+            else ganhosHoje += amt;
+        }
+
+        if (d >= weekAgoStr && d <= todayStr) {
+            if (t.type === 'expense') gastosSemana += amt;
+            else ganhosSemana += amt;
+        }
+
+        if (d.startsWith(monthStr)) {
+            if (t.type === 'expense') gastosMes += amt;
+            else ganhosMes += amt;
+        }
+    }
+
+    return {
+        hoje: ganhosHoje - gastosHoje,
+        gastosSemana, ganhosSemana, balancoSemana: ganhosSemana - gastosSemana,
+        gastosMes, ganhosMes, balancoMes: ganhosMes - gastosMes
+    };
+}
+
 export async function renderDashboard() {
     const root = document.getElementById('dashboard-root');
     try {
@@ -24,26 +68,20 @@ export async function renderDashboard() {
         window._libraryItems = libraryItems;
 
         // Calculate completion metrics
-        let completedCheckins = 0;
         let habitsCompleted = 0;
-        const totalCheckins = ALL_HABITS.length + 3; // 8 Habits + Sleep + Mood + Water
+        const totalCheckins = ALL_HABITS.length;
         
         if (!todayLog.habits) todayLog.habits = {};
 
         for (const habit of ALL_HABITS) {
             if (todayLog.habits[habit.id]) {
-                completedCheckins++;
                 habitsCompleted++;
             }
         }
 
-        if (todayLog.sleep) completedCheckins++;
-        if (todayLog.mood) completedCheckins++;
-        if ((todayLog.water || 0) > 0) completedCheckins++;
-
-        const todayPct = Math.round((completedCheckins / totalCheckins) * 100);
-        const missing = totalCheckins - completedCheckins;
-        const isAllDone = completedCheckins === totalCheckins;
+        const todayPct = Math.round((habitsCompleted / ALL_HABITS.length) * 100);
+        const missing = ALL_HABITS.length - habitsCompleted;
+        const isAllDone = habitsCompleted === ALL_HABITS.length;
 
         // Build weekly snap from real data (last 5 weekdays)
         const dayNames = ['D','S','T','Q','Q','S','S'];
@@ -67,10 +105,7 @@ export async function renderDashboard() {
             if (log && log.habits) {
                 let c = 0;
                 for (const h of ALL_HABITS) { if (log.habits[h.id]) c++; }
-                if (log.sleep) c++;
-                if (log.mood) c++;
-                if ((log.water || 0) > 0) c++;
-                pct = Math.round((c / totalCheckins) * 100);
+                pct = Math.round((c / ALL_HABITS.length) * 100);
             }
             const state = ds === todayStr ? 'today' : (ds < todayStr ? 'past' : 'future');
             weekDays.push({ day: dayNames[d.getDay()], state, pct });
@@ -95,9 +130,11 @@ export async function renderDashboard() {
             snapMessage = "O dia está voando. Hora do primeiro check-in!";
         }
 
+        const fMetrics = getFinanceMetrics(finances);
+
         // Generate the dynamic view UI
         root.innerHTML = getDashboardHTML({ 
-            todayLog, finances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
+            todayLog, finances, fMetrics, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
         });
 
         // Ensure dynamic dom texts are synced
@@ -598,26 +635,20 @@ window.updateWater = async (diff) => {
 
 async function recalculateProgress() {
     const todayLog = await DB.getTodayLog();
-    let comp = 0;
     let habitsCompleted = 0;
     
     if (!todayLog.habits) todayLog.habits = {};
     for (const habit of ALL_HABITS) {
         if (todayLog.habits[habit.id]) {
-            comp++;
             habitsCompleted++;
         }
     }
 
-    if (todayLog.sleep) comp++;
-    if (todayLog.mood) comp++;
-    if ((todayLog.water || 0) > 0) comp++;
-    
-    const tota = ALL_HABITS.length + 3;
-    const progressW = (comp / tota) * 100;
+    const tota = ALL_HABITS.length;
+    const progressW = (habitsCompleted / tota) * 100;
     
     const lblHabitCounter = document.getElementById('lbl-habit-counter');
-    if (lblHabitCounter) lblHabitCounter.innerText = `${habitsCompleted}/${ALL_HABITS.length}`;
+    if (lblHabitCounter) lblHabitCounter.innerText = `${habitsCompleted}/${tota}`;
     
     const internalBar = document.getElementById('checkin-internal-bar');
     if (internalBar) internalBar.style.width = `${progressW}%`;
@@ -627,34 +658,38 @@ async function recalculateProgress() {
     
     const container = document.getElementById('checkin-container');
 
-    if (comp === tota) {
+    if (habitsCompleted === tota) {
         if (container) {
             container.classList.remove('border-transparent');
             container.classList.add('border', 'border-primary/50', 'accent-border', 'shadow-[0_0_20px_var(--accent-color)]', 'accent-glow');
-        }
-        
-        // Auto Close the accordion smoothly
-        const el = document.getElementById('checkin-content');
-        const icon = document.getElementById('checkin-icon');
-        if (el && icon && !el.classList.contains('hidden')) {
-            setTimeout(() => {
-                el.style.maxHeight = '0px';
-                el.style.opacity = '0';
-                el.style.paddingBottom = '0px';
-                icon.classList.remove('rotate-180');
-                setTimeout(() => {
-                    el.classList.add('hidden');
-                    // Fully Re-render the dashboard to update Weekly Snap glow!
-                    renderDashboard();
-                }, 300);
-            }, 600); // 600ms reward feeling before sliding up
-        } else {
-            renderDashboard();
         }
     } else {
         if (container) {
             container.classList.add('border-transparent');
             container.classList.remove('border', 'border-primary/50', 'accent-border', 'shadow-[0_0_20px_var(--accent-color)]', 'accent-glow');
+        }
+    }
+
+    // REACTIVE SNAP UPDATE: Update the "Today" ring in the background snap card
+    const snapCircle = document.getElementById('snap-ring-today-circle');
+    const snapText = document.getElementById('snap-ring-today-text');
+    const snapContainer = document.getElementById('snap-ring-today-container');
+
+    if (snapCircle && snapText && snapContainer) {
+        const pct = Math.round(progressW);
+        const circumference = 2 * Math.PI * 16;
+        const offset = circumference - (progressW / 100) * circumference;
+        
+        if (pct === 100) {
+            // Perfect day!
+            snapContainer.style.boxShadow = '0 0 15px var(--accent-color)';
+            snapContainer.querySelector('svg').innerHTML = `<circle cx="20" cy="20" r="16" fill="var(--accent-color)" stroke="transparent" class="accent-bg" />`;
+            snapText.innerHTML = `<span class="material-symbols-outlined text-black opacity-90" style="font-size: 20px; font-variation-settings: 'FILL' 1;">local_fire_department</span>`;
+        } else {
+            // Partial progress
+            snapContainer.style.boxShadow = 'none';
+            snapCircle.style.strokeDashoffset = offset;
+            snapText.innerHTML = `<span class="text-[9px] font-extrabold tracking-tight text-on-surface-variant">${pct}%</span>`;
         }
     }
 }
@@ -667,36 +702,42 @@ window.openFinanceModal = async (type) => {
     const content = document.getElementById('finance-modal-content');
 
     if (type === 'dia') {
+        const metrics = getFinanceMetrics(finances);
+        const formatR$ = (val) => val.toFixed(2).replace('.', ',');
+        
         title.innerText = 'Dia a Dia';
         content.innerHTML = `
             <div class="bg-surface-container rounded-2xl p-4 border border-white/5 space-y-1 mb-2">
-                <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant block">Saldo Atual</span>
-                <span class="text-2xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">R$ 0,00</span>
+                <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant block">Balanço Hoje</span>
+                <span class="text-2xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">R$ ${formatR$(metrics.hoje)}</span>
             </div>
             <div class="flex justify-between items-center py-2 px-1">
                 <span class="text-on-surface-variant font-medium text-sm">Gasto na semana</span>
-                <span class="text-red-400 font-bold">- R$ 120,50</span>
+                <span class="text-red-400 font-bold">- R$ ${formatR$(metrics.gastosSemana)}</span>
             </div>
             <div class="flex justify-between items-center py-2 px-1 border-t border-white/5">
-                <span class="text-on-surface-variant font-medium text-sm">Gasto no mês</span>
-                <span class="text-red-400 font-bold">- R$ 450,00</span>
+                <span class="text-on-surface-variant font-medium text-sm">Gasto do mês</span>
+                <span class="text-red-400 font-bold">- R$ ${formatR$(metrics.gastosMes)}</span>
             </div>
         `;
     } else {
-        const balance = document.querySelector('#finance-modal').ownerDocument ? "..." : await DB.getFinances(); 
+        const balance = document.querySelector('#finance-modal').ownerDocument ? "..." : finances.balance; 
+        const metrics = getFinanceMetrics(finances);
+        const formatR$ = (val) => Math.abs(val).toFixed(2).replace('.', ',');
+        
         title.innerText = 'Meu Dinheiro';
         content.innerHTML = `
             <div class="bg-primary/10 rounded-2xl p-4 border border-primary/20 accent-border space-y-1 mb-2">
-                <span class="text-[10px] font-bold tracking-widest uppercase text-primary accent-text block">Saldo Atual</span>
-                <span class="text-2xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">R$ 1.250,00</span>
+                <span class="text-[10px] font-bold tracking-widest uppercase text-primary accent-text block">Saldo Atual (Total)</span>
+                <span class="text-2xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">R$ ${finances.balance.toFixed(2).replace('.', ',')}</span>
             </div>
             <div class="flex justify-between items-center py-2 px-1">
                 <span class="text-on-surface-variant font-medium text-sm">Balanço da semana</span>
-                <span class="text-primary accent-text font-bold">+ R$ 150,00</span>
+                <span class="${metrics.balancoSemana >= 0 ? 'text-primary' : 'text-red-400'} font-bold">${metrics.balancoSemana >= 0 ? '+' : '-'} R$ ${formatR$(metrics.balancoSemana)}</span>
             </div>
             <div class="flex justify-between items-center py-2 px-1 border-t border-white/5">
                 <span class="text-on-surface-variant font-medium text-sm">Balanço do mês</span>
-                <span class="text-primary accent-text font-bold">+ R$ 1.250,00</span>
+                <span class="${metrics.balancoMes >= 0 ? 'text-primary' : 'text-red-400'} font-bold">${metrics.balancoMes >= 0 ? '+' : '-'} R$ ${formatR$(metrics.balancoMes)}</span>
             </div>
         `;
     }

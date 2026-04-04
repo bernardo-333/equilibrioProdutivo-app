@@ -60,13 +60,16 @@ export function getDashboardHTML({
             ? `<span class="material-symbols-outlined text-black opacity-90" style="font-size: 20px; font-variation-settings: 'FILL' 1;">local_fire_department</span>`
             : `<span class="text-[9px] font-extrabold tracking-tight text-on-surface-variant">${percent}%</span>`; 
 
+        const idCircle = state === 'today' ? 'id="snap-ring-today-circle"' : '';
+        const idText = state === 'today' ? 'id="snap-ring-today-text"' : '';
+
         let circleHTML = '';
         if (isPerfect) {
             circleHTML = `<circle cx="20" cy="20" r="16" fill="var(--accent-color)" stroke="transparent" class="accent-bg" />`;
         } else {
             circleHTML = `
                 <circle cx="20" cy="20" r="16" fill="transparent" stroke="currentColor" stroke-width="3" class="text-white/10" />
-                <circle cx="20" cy="20" r="16" fill="transparent" stroke="currentColor" stroke-width="3" 
+                <circle ${idCircle} cx="20" cy="20" r="16" fill="transparent" stroke="currentColor" stroke-width="3" 
                         class="text-primary accent-text drop-shadow-[0_0_4px_currentColor]" 
                         stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round" />
             `;
@@ -78,12 +81,12 @@ export function getDashboardHTML({
         return `
         <div class="flex flex-col items-center gap-2 flex-shrink-0 min-w-[40px]">
             <span class="text-[10px] font-bold ${state === 'today' ? 'text-primary accent-text' : 'text-on-surface-variant'}">${dayToken}</span>
-            <div class="relative w-10 h-10 flex items-center justify-center rounded-full" ${glowStyle}>
+            <div class="relative w-10 h-10 flex items-center justify-center rounded-full" ${glowStyle} ${state === 'today' ? 'id="snap-ring-today-container"' : ''}>
                 ${todayPulse}
                 <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 40 40">
                     ${circleHTML}
                 </svg>
-                <div class="z-10 flex items-center justify-center">${innerContent}</div>
+                <div class="z-10 flex items-center justify-center" ${idText}>${innerContent}</div>
             </div>
         </div>`;
     };
@@ -153,17 +156,6 @@ export function getDashboardHTML({
                 </div>
             </section>
 
-            <!-- Learning Section — Cursos -->
-            <section class="space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-bold tracking-tight text-[var(--text-primary)] font-headline">Meus Cursos</h3>
-                    <span class="text-xs font-bold text-primary accent-text tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity" onclick="window.openLibraryModal('course')">Ver Todos</span>
-                </div>
-                <div class="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-4" style="scrollbar-width: none; -ms-overflow-style: none;">
-                    ${courses.length > 0 ? courses.map(renderLibCard).join('') : emptyCard('curso')}
-                </div>
-            </section>
-
             <!-- Learning Section — Livros -->
             <section class="space-y-4">
                 <div class="flex justify-between items-center">
@@ -172,6 +164,17 @@ export function getDashboardHTML({
                 </div>
                 <div class="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-4" style="scrollbar-width: none; -ms-overflow-style: none;">
                     ${books.length > 0 ? books.map(renderLibCard).join('') : emptyCard('livro')}
+                </div>
+            </section>
+
+            <!-- Learning Section — Cursos -->
+            <section class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold tracking-tight text-[var(--text-primary)] font-headline">Meus Cursos</h3>
+                    <span class="text-xs font-bold text-primary accent-text tracking-widest uppercase cursor-pointer hover:opacity-80 transition-opacity" onclick="window.openLibraryModal('course')">Ver Todos</span>
+                </div>
+                <div class="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-4" style="scrollbar-width: none; -ms-overflow-style: none;">
+                    ${courses.length > 0 ? courses.map(renderLibCard).join('') : emptyCard('curso')}
                 </div>
             </section>
         </div>

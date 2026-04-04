@@ -35,7 +35,6 @@ class App {
         this.user = user;
         this.currentTab = 'tab-dashboard';
         this.initNavigation();
-        this.loadSettings();
         
         // Initial Render
         this.renderTab(this.currentTab);
@@ -53,6 +52,28 @@ class App {
         }
 
         this.initScrollHeader();
+        this.updateDynamicGreeting();
+    }
+
+    getGreeting() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) return 'Bom dia';
+        if (hour >= 12 && hour < 18) return 'Boa tarde';
+        return 'Boa noite';
+    }
+
+    updateDynamicGreeting() {
+        const greeting = this.getGreeting();
+        const firstName = this.user.displayName ? this.user.displayName.split(' ')[0] : 'Usuário';
+        const dynamicTitle = `<span class='text-xl accent-text'>${greeting}</span><br/>${firstName}`;
+        
+        if (this.currentTab === 'tab-dashboard') {
+            document.getElementById('header-title').innerHTML = dynamicTitle;
+        }
+        
+        // Also update the data-title attribute for future clicks
+        const navDash = document.getElementById('nav-dashboard');
+        if (navDash) navDash.setAttribute('data-title', dynamicTitle);
     }
 
     async signOut() {
@@ -79,11 +100,6 @@ class App {
         });
     }
 
-    async loadSettings() {
-        const settings = await DB.getSettings();
-        this.applyAccentColor(settings.accent_color);
-    }
-
     applyAccentColor(color) {
         document.documentElement.style.setProperty('--accent-color', color);
         // We could calculate a slightly darker container color for --accent-container
@@ -94,7 +110,13 @@ class App {
         navItems.forEach(item => {
             item.addEventListener('click', () => {
                 const target = item.dataset.target;
-                const title = item.dataset.title;
+                let title = item.dataset.title;
+                
+                if (target === 'tab-dashboard') {
+                    const greeting = this.getGreeting();
+                    const firstName = this.user.displayName ? this.user.displayName.split(' ')[0] : 'Usuário';
+                    title = `<span class='text-xl accent-text'>${greeting}</span><br/>${firstName}`;
+                }
                 
                 if (target === this.currentTab) return; // already active
 
@@ -132,9 +154,6 @@ class App {
                 break;
             case 'tab-finances':
                 renderFinances();
-                break;
-            case 'tab-settings':
-                renderSettings();
                 break;
         }
     }

@@ -90,17 +90,17 @@ export const DB = {
     return snap.val();
   },
 
-  updateHabit: async (habitId, isCompleted) => {
-    const today = getTodayStr();
+  updateHabit: async (habitId, isCompleted, customDate = null) => {
+    const date = customDate || getTodayStr();
     // Using update so we don't overwrite mood/sleep
-    await DB.getRef(`daily_logs/${today}/habits`).update({
+    await DB.getRef(`daily_logs/${date}/habits`).update({
         [habitId]: isCompleted
     });
   },
 
-  updateDailyMetrics: async (metric, value) => {
-    const today = getTodayStr();
-    await DB.getRef(`daily_logs/${today}`).update({
+  updateDailyMetrics: async (metric, value, customDate = null) => {
+    const date = customDate || getTodayStr();
+    await DB.getRef(`daily_logs/${date}`).update({
         [metric]: value
     });
   },

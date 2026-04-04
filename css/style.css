@@ -6,11 +6,12 @@
   --text-primary: #ffffff;
   --text-secondary: #adaaaa;
   
-  /* Dynamic Accent Color that can be changed via JS */
-  --accent-color: #72fe8f;
-  --accent-container: #1cb853;
-  --on-accent: #005f26;
+  /* Dynamic Accent Color (Fixed to Blue now) */
+  --accent-color: #3b82f6;
+  --accent-container: #1d4ed8;
+  --on-accent: #ffffff;
   
+  --primary: #3b82f6;
   --secondary-color: #ff6f7c;
   --danger-color: #ff7351;
 }

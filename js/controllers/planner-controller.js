@@ -10,16 +10,13 @@ const HABITS = [
     { id: 'dinner', name: 'Janta' },
     { id: 'fill_notion', name: 'Preencher Notion' }
 ];
-const TOTAL_CHECKINS = HABITS.length + 3; // habits + sleep + mood + water
+const TOTAL_CHECKINS = HABITS.length;
 
 function calcDayPct(log) {
     if (!log) return 0;
     let c = 0;
     const habits = log.habits || {};
     for (const h of HABITS) { if (habits[h.id]) c++; }
-    if (log.sleep) c++;
-    if (log.mood) c++;
-    if ((log.water || 0) > 0) c++;
     return Math.round((c / TOTAL_CHECKINS) * 100);
 }
 
@@ -66,9 +63,10 @@ export async function renderPlanner() {
         const log = monthLogs[ds];
         if (!log) continue;
         const pct = calcDayPct(log);
-        const habits = HABITS.map(h => ({ name: h.name, done: !!(log.habits && log.habits[h.id]) }));
+        const habits = HABITS.map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
         historyDays.push({
             date: `${String(d).padStart(2,'0')} ${monthNames[month]}`,
+            rawDate: ds,
             pct,
             mood: log.mood || null,
             sleep: log.sleep || null,
@@ -151,41 +149,41 @@ window.openDailyDetail = (date) => {
 
     const waterFilled = Math.round(day.water);
     const waterDrops = [1,2,3,4,5].map(i =>
-        `<span class="text-4xl transition-all duration-300 ${i <= waterFilled ? 'drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]' : 'grayscale opacity-30'}">💧</span>`
+        `<button onclick="window.setWaterForDate('${day.rawDate}', ${i})" class="text-4xl transition-all duration-300 ${i <= waterFilled ? 'drop-shadow-[0_0_15px_rgba(34,211,238,0.6)] filter-none' : 'grayscale opacity-30'} hover:scale-110 active:scale-90">💧</button>`
     ).join('');
 
     content.innerHTML = `
-        <!-- Seção 1: Como você se sentiu (mesmo estilo do Check-in) -->
+        <!-- Seção 1: Como você se sentiu (interativo) -->
         <section class="space-y-4">
             <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Como você se sentiu?</h3>
             <div class="bg-surface-container-highest rounded-3xl p-5 border border-white/5 space-y-6">
 
-                <!-- Humor chips (read-only, ativo destacado) -->
+                <!-- Humor chips -->
                 <div class="space-y-3">
                     <span class="text-sm font-bold text-[var(--text-primary)] block">Humor Geral</span>
                     <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width:none;">
                         ${Object.keys(moodLabels).map(key => `
-                            <span class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
+                            <button onclick="window.setQualitativeForDate('${day.rawDate}', 'mood', '${key}')" class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
                                 ${key === day.mood
-                                    ? moodClasses[key]
-                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30'
-                                }">${moodLabels[key]}</span>
+                                    ? moodClasses[key] + ' opacity-100'
+                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30 hover:opacity-100'
+                                }">${moodLabels[key]}</button>
                         `).join('')}
                     </div>
                 </div>
 
                 <div class="h-px w-full bg-white/5"></div>
 
-                <!-- Sono chips (read-only, ativo destacado) -->
+                <!-- Sono chips -->
                 <div class="space-y-3">
                     <span class="text-sm font-bold text-[var(--text-primary)] block">Qualidade do Sono</span>
                     <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width:none;">
                         ${Object.keys(sleepLabels).map(key => `
-                            <span class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
+                            <button onclick="window.setQualitativeForDate('${day.rawDate}', 'sleep', '${key}')" class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
                                 ${key === day.sleep
-                                    ? sleepClasses[key]
-                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30'
-                                }">${sleepLabels[key]}</span>
+                                    ? sleepClasses[key] + ' opacity-100'
+                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30 hover:opacity-100'
+                                }">${sleepLabels[key]}</button>
                         `).join('')}
                     </div>
                 </div>
@@ -196,16 +194,6 @@ window.openDailyDetail = (date) => {
         <section class="space-y-4">
             <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Seu corpo e tempo</h3>
             <div class="grid grid-cols-2 gap-4">
-                <!-- Telas -->
-                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2">
-                    <span class="text-xs font-bold text-on-surface-variant px-1">Instagram</span>
-                    <div class="text-2xl font-extrabold text-[var(--text-primary)] font-headline pl-1">${day.telas}h</div>
-                </div>
-                <!-- Wake up - placeholder pois não temos no mock -->
-                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2">
-                    <span class="text-xs font-bold text-on-surface-variant px-1">Acordei às</span>
-                    <div class="text-2xl font-extrabold text-[var(--text-primary)] font-headline pl-1">06:30</div>
-                </div>
                 <!-- Água -->
                 <div class="col-span-2 bg-surface-container rounded-3xl p-5 border border-white/5 flex flex-col items-center gap-4">
                     <span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest text-center">Água Consumida (1 Gota = 1 Litro)</span>
@@ -217,7 +205,7 @@ window.openDailyDetail = (date) => {
             </div>
         </section>
 
-        <!-- Seção 3: As 8 Rotinas (mesmo layout do Check-in) -->
+        <!-- Seção 3: As 8 Rotinas (interativo) -->
         <section class="space-y-4">
             <div class="flex justify-between items-center pl-2 pr-1">
                 <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70">As 8 Rotinas</h3>
@@ -225,21 +213,26 @@ window.openDailyDetail = (date) => {
             </div>
             <div class="bg-surface-container rounded-[32px] p-2 space-y-1 border border-white/5">
                 ${day.habits.map(h => `
-                    <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : ''} transition-colors">
+                    <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : ''} transition-colors cursor-pointer group active:scale-[0.98]" onclick="window.toggleHabitForDate('${day.rawDate}', '${h.id}', ${!h.done})">
                         <div class="flex items-center gap-4">
                             <div class="w-10 h-10 rounded-xl bg-surface-highest flex items-center justify-center">
-                                <span class="material-symbols-outlined text-lg ${h.done ? 'text-primary accent-text' : 'text-on-surface-variant'}" style="font-variation-settings: 'FILL' ${h.done ? 1 : 0};">task_alt</span>
+                                <span class="material-symbols-outlined text-lg ${h.done ? 'text-primary accent-text' : 'text-on-surface-variant group-hover:text-white'}" style="font-variation-settings: 'FILL' ${h.done ? 1 : 0};">task_alt</span>
                             </div>
                             <span class="text-base font-bold transition-all ${h.done ? 'line-through opacity-50 text-on-surface-variant' : 'text-[var(--text-primary)]'}">${h.name}</span>
                         </div>
                         <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all
-                            ${h.done ? 'bg-primary accent-bg border-primary accent-border' : 'border-on-surface-variant/30'}">
+                            ${h.done ? 'bg-primary accent-bg border-primary accent-border' : 'border-on-surface-variant/30 group-hover:border-white/40'}">
                             ${h.done ? '<span class="material-symbols-outlined text-black font-bold mix-blend-color-burn" style="font-size:16px;">check</span>' : ''}
                         </div>
                     </div>
                 `).join('')}
             </div>
         </section>
+
+        <!-- Footer Button -->
+        <button onclick="window.closeDailyDetail();" class="w-full h-16 rounded-[24px] bg-primary accent-bg text-black font-extrabold text-lg shadow-xl active:scale-95 transition-transform mt-6">
+            Concluir Edição
+        </button>
     `;
 
     modal.classList.remove('hidden');
@@ -248,6 +241,29 @@ window.openDailyDetail = (date) => {
         overlay.classList.remove('opacity-0');
         sheet.classList.remove('translate-y-full');
     });
+};
+
+window.toggleHabitForDate = async (date, habitId, isCompleted) => {
+    await DB.updateHabit(habitId, isCompleted, date);
+    // Re-open/refresh modal to show change visually
+    const history = await DB.getMonthlyLogs(date.substring(0, 7));
+    // We need to find the day in our internal list again to render it
+    // Or just re-render the whole planner and re-open modal. 
+    // For simplicity, let's re-render planner and reopen the modal.
+    await renderPlanner();
+    window.openDailyDetail(date);
+};
+
+window.setQualitativeForDate = async (date, type, value) => {
+    await DB.updateDailyMetrics(type, value, date);
+    await renderPlanner();
+    window.openDailyDetail(date);
+};
+
+window.setWaterForDate = async (date, liters) => {
+    await DB.updateDailyMetrics('water', liters, date);
+    await renderPlanner();
+    window.openDailyDetail(date);
 };
 
 window.closeDailyDetail = () => {
