@@ -170,7 +170,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                         <span class="material-symbols-outlined text-lg font-bold">add</span>
                     </button>
                  </div>
-                 <div class="flex gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-6 pt-2 snap-x" style="scrollbar-width: none;">
+                 <div class="flex items-start gap-4 overflow-x-auto hide-scrollbar -mx-6 px-6 pb-6 pt-2 snap-x" style="scrollbar-width: none;">
                     ${(() => {
                         const typeColors = {
                             estudo: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
@@ -184,7 +184,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                         const renderCard = (item) => {
                             const tColor = typeColors[item.type] || typeColors.outro;
                             return `
-                    <div class="kanban-card p-4 bg-surface-container rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.3)] border border-white/5 cursor-pointer hover:bg-surface-highest hover:border-white/10 transition-all relative overflow-hidden group" draggable="true" data-card-id="${item.id}" onclick="window.openKanbanView('${item.id}')" ondragstart="event.stopPropagation()" >
+                    <div class="kanban-card flex-none p-4 bg-surface-container rounded-2xl shadow-[0_8px_25px_rgba(0,0,0,0.3)] border border-white/5 cursor-pointer hover:bg-surface-highest hover:border-white/10 transition-all relative overflow-hidden group" draggable="true" data-card-id="${item.id}" onclick="window.openKanbanView('${item.id}')" ondragstart="event.stopPropagation()" >
                                 <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary/40 accent-bg opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                 <div class="flex items-start justify-between mb-2">
                                     <span class="text-2xl leading-none filter drop-shadow-sm">${item.emoji || '🎯'}</span>
@@ -196,12 +196,12 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                         };
 
                         const generateKanbanCol = (id, title, icon, items) => `
-                        <div class="flex-shrink-0 w-[290px] flex flex-col gap-3">
+                        <div class="flex-shrink-0 self-start w-[290px] flex flex-col gap-3">
                             <h4 class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-4 flex items-center gap-2">
                                 <span class="material-symbols-outlined text-sm opacity-40">${icon}</span>
                                 ${title} <span class="w-1 h-1 bg-white/20 rounded-full"></span> <span class="text-primary">${items.length}</span>
                             </h4>
-                            <div class="kanban-column flex-1 bg-surface-container-low/50 backdrop-blur rounded-[32px] p-4 min-h-[350px] border border-white/5 space-y-3 shadow-inner" data-column="${id}">
+                            <div class="kanban-column h-auto bg-surface-container-low/50 backdrop-blur rounded-[32px] p-4 min-h-[350px] border border-white/5 space-y-3 shadow-inner" data-column="${id}">
                                 ${items.map(item => renderCard(item)).join('')}
                                 ${items.length === 0 ? '<div class="kanban-empty-state h-full flex items-center justify-center opacity-20 flex-col gap-2 mt-20"><span class="material-symbols-outlined text-4xl">inbox</span><p class="text-[10px] uppercase font-bold tracking-widest">Nada por aqui</p></div>' : ''}
                             </div>
