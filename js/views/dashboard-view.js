@@ -314,14 +314,14 @@ export function getDashboardHTML({
                                         <span class="text-xs font-bold text-on-surface-variant">Gasto Hoje</span>
                                         <div class="flex items-center">
                                             <span class="text-red-400 font-bold mr-1">R$</span>
-                                            <input type="number" placeholder="0,00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
+                                            <input id="input-fluxo-dia-expense" value="${todayLog.expense_dia || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
                                         </div>
                                     </div>
                                     <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
                                         <span class="text-xs font-bold text-on-surface-variant">Ganho Hoje</span>
                                         <div class="flex items-center">
                                             <span class="text-primary accent-text font-bold mr-1">R$</span>
-                                            <input type="number" placeholder="0,00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
+                                            <input id="input-fluxo-dia-income" value="${todayLog.income_dia || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
                                         </div>
                                     </div>
                                 </div>
@@ -335,14 +335,14 @@ export function getDashboardHTML({
                                         <span class="text-xs font-bold text-on-surface-variant">Gasto Hoje</span>
                                         <div class="flex items-center">
                                             <span class="text-red-400 font-bold mr-1">R$</span>
-                                            <input type="number" placeholder="0,00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
+                                            <input id="input-fluxo-din-expense" value="${todayLog.expense_din || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
                                         </div>
                                     </div>
                                     <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
                                         <span class="text-xs font-bold text-on-surface-variant">Ganho Hoje</span>
                                         <div class="flex items-center">
                                             <span class="text-primary accent-text font-bold mr-1">R$</span>
-                                            <input type="number" placeholder="0,00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
+                                            <input id="input-fluxo-din-income" value="${todayLog.income_din || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">
                                         </div>
                                     </div>
                                 </div>

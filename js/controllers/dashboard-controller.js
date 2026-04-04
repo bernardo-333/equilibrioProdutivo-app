@@ -223,6 +223,24 @@ window.closeCheckinModal = async () => {
         await DB.updateDailyMetrics('instagram', instagramInput.value);
     }
 
+    // Save Daily Finances
+    const incDiaId = document.getElementById('input-fluxo-dia-income');
+    const expDiaId = document.getElementById('input-fluxo-dia-expense');
+    const incDinId = document.getElementById('input-fluxo-din-income');
+    const expDinId = document.getElementById('input-fluxo-din-expense');
+
+    if (incDiaId || expDiaId || incDinId || expDinId) {
+        const payload = {
+            income_dia: incDiaId ? (parseFloat(incDiaId.value) || 0) : 0,
+            expense_dia: expDiaId ? (parseFloat(expDiaId.value) || 0) : 0,
+            income_din: incDinId ? (parseFloat(incDinId.value) || 0) : 0,
+            expense_din: expDinId ? (parseFloat(expDinId.value) || 0) : 0
+        };
+        const todayStr = new Date().toISOString().split('T')[0];
+        // Sincroniza log estÃ¡tico e mÃ©trica global (TransaÃ§Ãµes diÃ¡rias fixas)
+        await DB.updateDailyFinances(todayStr, payload);
+    }
+
     const el = document.getElementById('checkin-modal');
     const overlay = document.getElementById('checkin-modal-overlay');
     const sheet = document.getElementById('checkin-modal-sheet');
@@ -231,10 +249,11 @@ window.closeCheckinModal = async () => {
     overlay.classList.add('opacity-0');
     sheet.classList.add('translate-y-full');
     
-    // Wait for the transition to finish to hide elements
+    // Wait for the transition to finish to hide elements and refresh data globally
     setTimeout(() => {
         el.classList.add('hidden');
         el.classList.remove('flex');
+        window.renderDashboard(); 
     }, 500); // matches duration-500
 };
 

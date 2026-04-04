@@ -343,14 +343,8 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                     </div>
                 </div>
                 <!-- Scrollable Content -->
-                <div class="flex-1 overflow-y-auto px-6 py-6 pb-28 space-y-10 hide-scrollbar" id="day-detail-content">
+                <div class="flex-1 overflow-y-auto px-6 py-6 pb-12 space-y-10 hide-scrollbar" id="day-detail-content">
                     <!-- Dinamicamente preenchido -->
-                </div>
-                <!-- Fixed Footer — igual ao check-in -->
-                <div class="absolute bottom-0 left-0 w-full px-6 pt-10 pb-6 bg-gradient-to-t from-surface-container-low via-surface-container-low to-transparent" style="padding-bottom: env(safe-area-inset-bottom, 24px);">
-                    <button class="w-full h-16 rounded-[24px] bg-primary accent-bg text-black font-extrabold text-lg shadow-[0_10px_30px_rgba(var(--accent-color-rgb),0.3)] hover:scale-[1.02] active:scale-95 transition-transform" onclick="window.editSpecificDay()">
-                        Editar Este Dia
-                    </button>
                 </div>
             </div>
         </div>

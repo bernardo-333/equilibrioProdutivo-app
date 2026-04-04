@@ -72,6 +72,10 @@ export async function renderPlanner() {
             sleep: log.sleep || null,
             water: log.water || 0,
             telas: log.screen_time || 0,
+            income_dia: log.income_dia || 0,
+            expense_dia: log.expense_dia || 0,
+            income_din: log.income_din || 0,
+            expense_din: log.expense_din || 0,
             habits
         });
     }
@@ -211,6 +215,68 @@ window.openDailyDetail = (date, isEditMode = false) => {
                     </div>
                     <span class="text-[10px] font-bold text-cyan-400 tracking-widest">${day.water}L no total</span>
                 </div>
+                
+                <!-- Fluxo Financeiro Diário -->
+                <div class="col-span-2 space-y-4 pt-2">
+                    <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} flex items-center gap-2">
+                        Fluxo do Caixa ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
+                    </h3>
+                    
+                    <!-- Carteira Dia a Dia -->
+                    <div class="space-y-3">
+                        <span class="text-sm font-bold text-[var(--text-primary)] px-2">Carteira "Dia a Dia"</span>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group ${isEditMode ? 'focus-within:ring-2 focus-within:ring-red-400' : ''}">
+                                <span class="text-xs font-bold text-on-surface-variant">Gasto do Dia</span>
+                                <div class="flex items-center">
+                                    <span class="text-red-400 font-bold mr-1">R$</span>
+                                    ${isEditMode ? 
+                                        `<input id="input-planner-dia-expense" value="${day.expense_dia || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">`
+                                        : `<span class="text-xl font-extrabold text-[var(--text-primary)] font-headline">${Number(day.expense_dia || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>`
+                                    }
+                                </div>
+                            </div>
+                            <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
+                                <span class="text-xs font-bold text-on-surface-variant">Ganho do Dia</span>
+                                <div class="flex items-center">
+                                    <span class="text-primary accent-text font-bold mr-1">R$</span>
+                                    ${isEditMode ? 
+                                        `<input id="input-planner-dia-income" value="${day.income_dia || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">`
+                                        : `<span class="text-xl font-extrabold text-[var(--text-primary)] font-headline">${Number(day.income_dia || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>`
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Carteira Meu Dinheiro -->
+                    <div class="space-y-3 pt-2">
+                        <span class="text-sm font-bold text-[var(--text-primary)] px-2">Carteira "Meu Dinheiro"</span>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group ${isEditMode ? 'focus-within:ring-2 focus-within:ring-red-400' : ''}">
+                                <span class="text-xs font-bold text-on-surface-variant">Gasto do Dia</span>
+                                <div class="flex items-center">
+                                    <span class="text-red-400 font-bold mr-1">R$</span>
+                                    ${isEditMode ? 
+                                        `<input id="input-planner-din-expense" value="${day.expense_din || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">`
+                                        : `<span class="text-xl font-extrabold text-[var(--text-primary)] font-headline">${Number(day.expense_din || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>`
+                                    }
+                                </div>
+                            </div>
+                            <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
+                                <span class="text-xs font-bold text-on-surface-variant">Ganho do Dia</span>
+                                <div class="flex items-center">
+                                    <span class="text-primary accent-text font-bold mr-1">R$</span>
+                                    ${isEditMode ? 
+                                        `<input id="input-planner-din-income" value="${day.income_din || ''}" type="number" step="0.01" placeholder="0.00" class="w-full bg-transparent border-none text-xl font-extrabold text-[var(--text-primary)] p-0 focus:outline-none focus:ring-0 appearance-none font-headline">`
+                                        : `<span class="text-xl font-extrabold text-[var(--text-primary)] font-headline">${Number(day.income_din || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>`
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </section>
 
@@ -255,7 +321,7 @@ window.openDailyDetail = (date, isEditMode = false) => {
 
         <!-- Footer Buttons -->
         ${isEditMode ? `
-        <button onclick="window.closeDailyDetail(); window.renderPlanner();" class="w-full h-16 rounded-[24px] bg-primary accent-bg text-black font-extrabold text-lg shadow-xl active:scale-95 transition-transform mt-6">
+        <button onclick="window.saveAndCloseDailyDetail('${rawDate}');" class="w-full h-16 rounded-[24px] bg-primary accent-bg text-black font-extrabold text-lg shadow-xl active:scale-95 transition-transform mt-6">
             Salvar e Concluir
         </button>
         ` : `
@@ -308,6 +374,32 @@ window.setWaterForDate = async (date, liters) => {
     window.openDailyDetail(date, true);
 };
 
+window.saveAndCloseDailyDetail = async (date) => {
+    // Busca os 4 campos se estiverem renderizados no HTML
+    const incDiaId = document.getElementById('input-planner-dia-income');
+    const expDiaId = document.getElementById('input-planner-dia-expense');
+    const incDinId = document.getElementById('input-planner-din-income');
+    const expDinId = document.getElementById('input-planner-din-expense');
+    
+    if (incDiaId || expDiaId || incDinId || expDinId) {
+        const payload = {
+            income_dia: incDiaId ? (parseFloat(incDiaId.value) || 0) : 0,
+            expense_dia: expDiaId ? (parseFloat(expDiaId.value) || 0) : 0,
+            income_din: incDinId ? (parseFloat(incDinId.value) || 0) : 0,
+            expense_din: expDinId ? (parseFloat(expDinId.value) || 0) : 0
+        };
+        // Salva
+        await DB.updateDailyFinances(date, payload);
+    }
+
+    // Fechar Modal
+    window.closeDailyDetail();
+    // Render Planner Completo (com os saldos reatualizados)
+    setTimeout(() => {
+        window.renderPlanner();
+    }, 400); // aguarda a animaÃ§Ã£o de fechar iniciar
+};
+
 window.closeDailyDetail = () => {
     const modal = document.getElementById('day-detail-modal');
     const overlay = document.getElementById('day-detail-overlay');
@@ -319,12 +411,6 @@ window.closeDailyDetail = () => {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }, 500); // UI closes securely
-};
-
-window.editSpecificDay = () => {
-    // For MVP leads to the same check-in modal or a copy
-    window.closeDailyDetail();
-    // In a real app we'd load this day's data into the checkin form
 };
 
 // ----- FULL HISTORY LOGIC -----

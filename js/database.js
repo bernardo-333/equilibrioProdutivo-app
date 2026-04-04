@@ -97,7 +97,6 @@ export const DB = {
         [habitId]: isCompleted
     });
   },
-
   updateDailyMetrics: async (metric, value, customDate = null) => {
     const date = customDate || getTodayStr();
     await DB.getRef(`daily_logs/${date}`).update({
@@ -105,6 +104,50 @@ export const DB = {
     });
   },
 
+  updateDailyFinances: async (dateStr, payload) => {
+    // 1. Atualizar o log do dia pra manter a state (os 4 inputs)
+    const logRef = DB.getRef(`daily_logs/${dateStr}`);
+    await logRef.update(payload);
+
+    // 2. Atualizar a timeline Global de transaÃ§Ãµes para bater o Saldo Resumo
+    const financesRef = DB.getRef('finances');
+    const snap = await financesRef.once('value');
+    const finances = snap.val() || { transactions: [], balance: 0 };
+    
+    let trans = finances.transactions || [];
+    let balance = Number(finances.balance || 0);
+
+    // Encontrar transaÃ§Ãµes aninhadas do "Dia" e revertÃª-las no saldo para limpar (Overwrite behavior)
+    const oldTrans = trans.filter(t => t.description === 'Registro Diario' && (t.date || '').startsWith(dateStr));
+    oldTrans.forEach(t => {
+       // sÃ³ reverte balance se for da conta "Meu Dinheiro", assumindo que a do Dia a Dia nÃ£o afeta "balance" principal e sim transaÃ§Ãµes isoladas.
+       // na dÃºvida, revertemos de volta o balance para Meu Dinheiro:
+       if (t.category === 'ganho_dinheiro') balance -= Number(t.amount);
+       if (t.category === 'gasto_dinheiro') balance += Number(t.amount);
+    });
+
+    // Filtra array original, deletando as "oldTrans"
+    trans = trans.filter(t => !(t.description === 'Registro Diario' && (t.date || '').startsWith(dateStr)));
+
+    const createDateStamp = () => new Date(dateStr + "T12:00:00").toISOString();
+
+    const addT = (amt, type, cat) => {
+      if (amt && amt > 0) {
+        trans.push({ id: DB.generateId(), type: type, amount: Math.abs(amt), description: 'Registro Diario', category: cat, date: createDateStamp() });
+        // atualiza global apenas carteira "dinheiro" pra nÃ£o somar dia a dia repetindo dados fÃ­sicos
+        if (cat === 'ganho_dinheiro') balance += Math.abs(amt);
+        if (cat === 'gasto_dinheiro') balance -= Math.abs(amt);
+      }
+    };
+
+    addT(payload.income_dia, 'income', 'ganho_dia');
+    addT(payload.expense_dia, 'expense', 'gasto_dia');
+    addT(payload.income_din, 'income', 'ganho_dinheiro');
+    addT(payload.expense_din, 'expense', 'gasto_dinheiro');
+
+    // Salva back ao Firebase
+    await financesRef.update({ balance, transactions: trans });
+  },
   getMonthlyLogs: async (yearMonth) => {
     // Busca logs diários que começam com o ano/mês "YYYY-MM"
     const snap = await DB.getRef('daily_logs').orderByKey().startAt(yearMonth).endAt(yearMonth + '\uf8ff').once('value');
