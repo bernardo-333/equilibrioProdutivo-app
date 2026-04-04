@@ -13,55 +13,34 @@ const ALL_HABITS = [
     { id: 'fill_notion', name: 'Preencher Notion', icon: 'edit_note' }
 ];
 
-// Helper for dynamic local finances calculations
-function getFinanceMetrics(finances) {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    
-    // Semanal: last 7 days 
-    const weekAgo = new Date(now);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+function getDashboardBalances(allLogs, todayStr) {
+    const logs = Object.values(allLogs || {});
+    const diaBalance = logs.reduce((sum, log) => {
+        return sum + Number(log.income_dia || 0) - Number(log.expense_dia || 0);
+    }, 0);
+    const dinheiroBalance = logs.reduce((sum, log) => {
+        return sum + Number(log.income_din || 0) - Number(log.expense_din || 0);
+    }, 0);
 
-    // Mensal: this month
-    const monthStr = todayStr.substring(0, 7);
+    return { diaBalance, dinheiroBalance };
+}
 
-    let gastosHoje = 0, ganhosHoje = 0;
-    let gastosSemana = 0, ganhosSemana = 0;
-    let gastosMes = 0, ganhosMes = 0;
+function calcDayPctFromLog(log) {
+    if (!log) return 0;
+    if (log.rest_day) return 100;
 
-    for (const t of (finances.transactions || [])) {
-        const amt = Number(t.amount || 0);
-        const d = (t.date || '').substring(0, 10);
-        
-        if (d === todayStr) {
-            if (t.type === 'expense') gastosHoje += amt;
-            else ganhosHoje += amt;
-        }
-
-        if (d >= weekAgoStr && d <= todayStr) {
-            if (t.type === 'expense') gastosSemana += amt;
-            else ganhosSemana += amt;
-        }
-
-        if (d.startsWith(monthStr)) {
-            if (t.type === 'expense') gastosMes += amt;
-            else ganhosMes += amt;
-        }
+    let habitsCompleted = 0;
+    const habits = log.habits || {};
+    for (const habit of ALL_HABITS) {
+        if (habits[habit.id]) habitsCompleted++;
     }
-
-    return {
-        hoje: ganhosHoje - gastosHoje,
-        gastosSemana, ganhosSemana, balancoSemana: ganhosSemana - gastosSemana,
-        gastosMes, ganhosMes, balancoMes: ganhosMes - gastosMes
-    };
+    return Math.round((habitsCompleted / ALL_HABITS.length) * 100);
 }
 
 export async function renderDashboard() {
     const root = document.getElementById('dashboard-root');
     try {
         const todayLog = await DB.getTodayLog();
-        const finances = await DB.getFinances();
         const libraryItems = await DB.getLibrary();
 
         // Store globally for view/edit lookups
@@ -69,24 +48,22 @@ export async function renderDashboard() {
 
         // Calculate completion metrics
         let habitsCompleted = 0;
-        const totalCheckins = ALL_HABITS.length;
-        
         if (!todayLog.habits) todayLog.habits = {};
-
         for (const habit of ALL_HABITS) {
-            if (todayLog.habits[habit.id]) {
-                habitsCompleted++;
-            }
+            if (todayLog.habits[habit.id]) habitsCompleted++;
         }
 
-        const todayPct = Math.round((habitsCompleted / ALL_HABITS.length) * 100);
+        const isRestDay = !!todayLog.rest_day;
+        const todayPct = calcDayPctFromLog(todayLog);
         const missing = ALL_HABITS.length - habitsCompleted;
-        const isAllDone = habitsCompleted === ALL_HABITS.length;
+        const isAllDone = isRestDay || habitsCompleted === ALL_HABITS.length;
 
         // Build weekly snap from real data (last 5 weekdays)
         const dayNames = ['D','S','T','Q','Q','S','S'];
         const now = new Date();
         const todayStr = now.toISOString().split('T')[0];
+        const allLogs = await DB.getAllDailyLogs();
+        const balances = getDashboardBalances(allLogs, todayStr);
         const yearMonth = todayStr.substring(0, 7);
         const monthLogs = await DB.getMonthlyLogs(yearMonth);
 
@@ -101,24 +78,23 @@ export async function renderDashboard() {
         for (let i = 0; i < 5; i++) {
             const ds = d.toISOString().split('T')[0];
             const log = monthLogs[ds];
-            let pct = 0;
-            if (log && log.habits) {
-                let c = 0;
-                for (const h of ALL_HABITS) { if (log.habits[h.id]) c++; }
-                pct = Math.round((c / ALL_HABITS.length) * 100);
-            }
+            const pct = calcDayPctFromLog(log);
+            const isRestDayLog = !!(log && log.rest_day);
             const state = ds === todayStr ? 'today' : (ds < todayStr ? 'past' : 'future');
-            weekDays.push({ day: dayNames[d.getDay()], state, pct });
+            weekDays.push({ day: dayNames[d.getDay()], state, pct, isRestDay: isRestDayLog });
             d.setDate(d.getDate() + 1);
         }
         const weekData = weekDays;
 
         // Dynamic snap message
-        const perfectDaysCount = weekData.filter(d => d.pct === 100).length;
+        const perfectDaysCount = weekData.filter(d => d.pct === 100 && !d.isRestDay).length;
         const isMonday = now.getDay() === 1;
         const todayIdx = weekData.findIndex(d => d.state === 'today');
         
         let snapMessage = `${perfectDaysCount} dias perfeitos. <span class="text-primary accent-text">Não quebre a sequência hoje!</span>`;
+        if (isRestDay) {
+            snapMessage = "Hoje é dia de descanso. Recuperar também é disciplina.";
+        }
         
         if (perfectDaysCount === 5) {
             snapMessage = "Semana Lendária concluída! Descanse nos fins de semana.";
@@ -129,12 +105,9 @@ export async function renderDashboard() {
         } else if (todayPct === 0) {
             snapMessage = "O dia está voando. Hora do primeiro check-in!";
         }
-
-        const fMetrics = getFinanceMetrics(finances);
-
         // Generate the dynamic view UI
         root.innerHTML = getDashboardHTML({ 
-            todayLog, finances, fMetrics, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
+            todayLog, balances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
         });
 
         // Ensure dynamic dom texts are synced
@@ -204,6 +177,9 @@ window.openCheckinModal = async () => {
     const instagramInput = document.getElementById('input-instagram');
     if (screenInput) screenInput.value = todayLog.screen_time || '';
     if (instagramInput) instagramInput.value = todayLog.instagram || '';
+
+    // Rest day toggle
+    window.toggleRestDay(!!todayLog.rest_day, true);
     
     // Trigger animations smooth slide up
     requestAnimationFrame(() => {
@@ -216,12 +192,18 @@ window.closeCheckinModal = async () => {
     // Save screen_time and instagram before closing
     const screenInput = document.getElementById('input-screen-time');
     const instagramInput = document.getElementById('input-instagram');
-    if (screenInput && screenInput.value) {
-        await DB.updateDailyMetrics('screen_time', screenInput.value);
+    const updates = [];
+
+    if (screenInput) {
+        updates.push(DB.updateDailyMetrics('screen_time', screenInput.value || ''));
     }
-    if (instagramInput && instagramInput.value) {
-        await DB.updateDailyMetrics('instagram', instagramInput.value);
+    if (instagramInput) {
+        updates.push(DB.updateDailyMetrics('instagram', instagramInput.value || ''));
     }
+
+    const restBtn = document.getElementById('rest-day-toggle-checkin');
+    const isRestDay = restBtn?.dataset.active === 'true';
+    updates.push(DB.updateDailyMetrics('rest_day', !!isRestDay));
 
     // Save Daily Finances
     const incDiaId = document.getElementById('input-fluxo-dia-income');
@@ -237,9 +219,10 @@ window.closeCheckinModal = async () => {
             expense_din: expDinId ? (parseFloat(expDinId.value) || 0) : 0
         };
         const todayStr = new Date().toISOString().split('T')[0];
-        // Sincroniza log estÃ¡tico e mÃ©trica global (TransaÃ§Ãµes diÃ¡rias fixas)
-        await DB.updateDailyFinances(todayStr, payload);
+        updates.push(DB.updateDailyFinances(todayStr, payload));
     }
+
+    await Promise.all(updates);
 
     const el = document.getElementById('checkin-modal');
     const overlay = document.getElementById('checkin-modal-overlay');
@@ -253,7 +236,7 @@ window.closeCheckinModal = async () => {
     setTimeout(() => {
         el.classList.add('hidden');
         el.classList.remove('flex');
-        window.renderDashboard(); 
+        renderDashboard(); 
     }, 500); // matches duration-500
 };
 
@@ -606,6 +589,12 @@ window.selectChip = (element, groupClass, silent = false) => {
 };
 
 window.toggleHabit = async (habitId, isCompleted) => {
+    const restBtn = document.getElementById('rest-day-toggle-checkin');
+    if (restBtn?.dataset.active === 'true') {
+        alert('Dia de descanso ativo. Desative para editar hábitos.');
+        return;
+    }
+
     await DB.updateHabit(habitId, isCompleted);
     recalculateProgress();
     
@@ -652,6 +641,34 @@ window.updateWater = async (diff) => {
     recalculateProgress();
 };
 
+window.toggleRestDay = async (forceValue = null, silent = false) => {
+    const btn = document.getElementById('rest-day-toggle-checkin');
+    const badge = document.getElementById('rest-day-badge-checkin');
+    const habitsSection = document.getElementById('checkin-habits-section');
+    if (!btn || !badge || !habitsSection) return;
+
+    const current = btn.dataset.active === 'true';
+    const next = forceValue === null ? !current : !!forceValue;
+    btn.dataset.active = String(next);
+
+    if (next) {
+        btn.classList.add('bg-amber-400/20', 'border-amber-300/40', 'text-amber-200');
+        btn.classList.remove('bg-surface-highest', 'border-white/10', 'text-on-surface-variant');
+        badge.classList.remove('hidden');
+        habitsSection.classList.add('opacity-40');
+    } else {
+        btn.classList.remove('bg-amber-400/20', 'border-amber-300/40', 'text-amber-200');
+        btn.classList.add('bg-surface-highest', 'border-white/10', 'text-on-surface-variant');
+        badge.classList.add('hidden');
+        habitsSection.classList.remove('opacity-40');
+    }
+
+    if (!silent) {
+        await DB.updateDailyMetrics('rest_day', next);
+        await recalculateProgress();
+    }
+};
+
 async function recalculateProgress() {
     const todayLog = await DB.getTodayLog();
     let habitsCompleted = 0;
@@ -664,10 +681,11 @@ async function recalculateProgress() {
     }
 
     const tota = ALL_HABITS.length;
-    const progressW = (habitsCompleted / tota) * 100;
+    const isRestDay = !!todayLog.rest_day;
+    const progressW = isRestDay ? 100 : (habitsCompleted / tota) * 100;
     
     const lblHabitCounter = document.getElementById('lbl-habit-counter');
-    if (lblHabitCounter) lblHabitCounter.innerText = `${habitsCompleted}/${tota}`;
+    if (lblHabitCounter) lblHabitCounter.innerText = isRestDay ? 'Descanso' : `${habitsCompleted}/${tota}`;
     
     const internalBar = document.getElementById('checkin-internal-bar');
     if (internalBar) internalBar.style.width = `${progressW}%`;
@@ -677,7 +695,7 @@ async function recalculateProgress() {
     
     const container = document.getElementById('checkin-container');
 
-    if (habitsCompleted === tota) {
+    if (isRestDay || habitsCompleted === tota) {
         if (container) {
             container.classList.remove('border-transparent');
             container.classList.add('border', 'border-primary/50', 'accent-border', 'shadow-[0_0_20px_var(--accent-color)]', 'accent-glow');
@@ -699,7 +717,11 @@ async function recalculateProgress() {
         const circumference = 2 * Math.PI * 16;
         const offset = circumference - (progressW / 100) * circumference;
         
-        if (pct === 100) {
+        if (isRestDay) {
+            snapContainer.style.boxShadow = '0 0 15px rgba(251,191,36,0.45)';
+            snapContainer.querySelector('svg').innerHTML = `<circle cx="20" cy="20" r="16" fill="#fbbf24" stroke="transparent" />`;
+            snapText.innerHTML = `<span class="material-symbols-outlined text-black opacity-90" style="font-size: 20px; font-variation-settings: 'FILL' 1;">hotel</span>`;
+        } else if (pct === 100) {
             // Perfect day!
             snapContainer.style.boxShadow = '0 0 15px var(--accent-color)';
             snapContainer.querySelector('svg').innerHTML = `<circle cx="20" cy="20" r="16" fill="var(--accent-color)" stroke="transparent" class="accent-bg" />`;
@@ -713,78 +735,10 @@ async function recalculateProgress() {
     }
 }
 
-window.openFinanceModal = async (type) => {
-    const el = document.getElementById('finance-modal');
-    const overlay = document.getElementById('finance-modal-overlay');
-    const sheet = document.getElementById('finance-modal-sheet');
-    const title = document.getElementById('finance-modal-title');
-    const content = document.getElementById('finance-modal-content');
-
-    if (type === 'dia') {
-        const metrics = getFinanceMetrics(finances);
-        const formatR$ = (val) => val.toFixed(2).replace('.', ',');
-        
-        title.innerText = 'Dia a Dia';
-        content.innerHTML = `
-            <div class="bg-surface-container rounded-2xl p-4 border border-white/5 space-y-1 mb-2">
-                <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant block">Balanço Hoje</span>
-                <span class="text-2xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">R$ ${formatR$(metrics.hoje)}</span>
-            </div>
-            <div class="flex justify-between items-center py-2 px-1">
-                <span class="text-on-surface-variant font-medium text-sm">Gasto na semana</span>
-                <span class="text-red-400 font-bold">- R$ ${formatR$(metrics.gastosSemana)}</span>
-            </div>
-            <div class="flex justify-between items-center py-2 px-1 border-t border-white/5">
-                <span class="text-on-surface-variant font-medium text-sm">Gasto do mês</span>
-                <span class="text-red-400 font-bold">- R$ ${formatR$(metrics.gastosMes)}</span>
-            </div>
-        `;
-    } else {
-        const balance = document.querySelector('#finance-modal').ownerDocument ? "..." : finances.balance; 
-        const metrics = getFinanceMetrics(finances);
-        const formatR$ = (val) => Math.abs(val).toFixed(2).replace('.', ',');
-        
-        title.innerText = 'Meu Dinheiro';
-        content.innerHTML = `
-            <div class="bg-primary/10 rounded-2xl p-4 border border-primary/20 accent-border space-y-1 mb-2">
-                <span class="text-[10px] font-bold tracking-widest uppercase text-primary accent-text block">Saldo Atual (Total)</span>
-                <span class="text-2xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">R$ ${finances.balance.toFixed(2).replace('.', ',')}</span>
-            </div>
-            <div class="flex justify-between items-center py-2 px-1">
-                <span class="text-on-surface-variant font-medium text-sm">Balanço da semana</span>
-                <span class="${metrics.balancoSemana >= 0 ? 'text-primary' : 'text-red-400'} font-bold">${metrics.balancoSemana >= 0 ? '+' : '-'} R$ ${formatR$(metrics.balancoSemana)}</span>
-            </div>
-            <div class="flex justify-between items-center py-2 px-1 border-t border-white/5">
-                <span class="text-on-surface-variant font-medium text-sm">Balanço do mês</span>
-                <span class="${metrics.balancoMes >= 0 ? 'text-primary' : 'text-red-400'} font-bold">${metrics.balancoMes >= 0 ? '+' : '-'} R$ ${formatR$(metrics.balancoMes)}</span>
-            </div>
-        `;
-    }
-
-    // Display modal
-    el.classList.remove('hidden');
-    el.classList.add('flex');
-    
-    // Animate smoothly
-    requestAnimationFrame(() => {
-        overlay.classList.remove('opacity-0');
-        sheet.classList.remove('scale-95', 'opacity-0');
-        sheet.classList.add('scale-100', 'opacity-100');
-    });
+window.openFinanceModal = () => {
+    // Financeiro em modo futuro: sem acao por enquanto.
 };
 
 window.closeFinanceModal = () => {
-    const overlay = document.getElementById('finance-modal-overlay');
-    const sheet = document.getElementById('finance-modal-sheet');
-    const el = document.getElementById('finance-modal');
-    
-    overlay.classList.add('opacity-0');
-    sheet.classList.remove('scale-100', 'opacity-100');
-    sheet.classList.add('scale-95', 'opacity-0');
-    
-    // Wait for translation to finish before dropping flex
-    setTimeout(() => {
-        el.classList.add('hidden');
-        el.classList.remove('flex');
-    }, 300);
+    // Financeiro em modo futuro: sem acao por enquanto.
 };

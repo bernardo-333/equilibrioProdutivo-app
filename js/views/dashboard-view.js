@@ -1,6 +1,11 @@
 export function getDashboardHTML({ 
-    todayLog, finances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS, snapMessage, libraryItems 
+    todayLog, balances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS, snapMessage, libraryItems 
 }) {
+    const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
     // Helper: render a library carousel card
     const renderLibCard = (item) => {
         const pct = item.total > 0 ? Math.round((item.current / item.total) * 100) : 0;
@@ -38,7 +43,7 @@ export function getDashboardHTML({
     const emptyCard = (label) => `<div class="min-w-[240px] bg-surface-container rounded-3xl p-5 border border-dashed border-white/10 flex items-center justify-center"><span class="text-sm text-on-surface-variant/30">Nenhum ${label} cadastrado</span></div>`;
 
     // Helper for generating progress rings
-    const generateRing = (dayToken, state, percent) => {
+    const generateRing = (dayToken, state, percent, isRestDay = false) => {
         if (state === 'future') {
             // Rule 1: Ghost Rings
             return `
@@ -56,7 +61,9 @@ export function getDashboardHTML({
         const offset = c - (c * percent) / 100;
         const isPerfect = percent === 100;
 
-        let innerContent = isPerfect 
+        let innerContent = isRestDay
+            ? `<span class="material-symbols-outlined text-black opacity-90" style="font-size: 18px; font-variation-settings: 'FILL' 1;">hotel</span>`
+            : isPerfect 
             ? `<span class="material-symbols-outlined text-black opacity-90" style="font-size: 20px; font-variation-settings: 'FILL' 1;">local_fire_department</span>`
             : `<span class="text-[9px] font-extrabold tracking-tight text-on-surface-variant">${percent}%</span>`; 
 
@@ -64,7 +71,9 @@ export function getDashboardHTML({
         const idText = state === 'today' ? 'id="snap-ring-today-text"' : '';
 
         let circleHTML = '';
-        if (isPerfect) {
+        if (isRestDay) {
+            circleHTML = `<circle cx="20" cy="20" r="16" fill="#fbbf24" stroke="transparent" />`;
+        } else if (isPerfect) {
             circleHTML = `<circle cx="20" cy="20" r="16" fill="var(--accent-color)" stroke="transparent" class="accent-bg" />`;
         } else {
             circleHTML = `
@@ -76,7 +85,9 @@ export function getDashboardHTML({
         }
 
         const todayPulse = state === 'today' ? `<div class="absolute inset-0 rounded-full animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite] border border-primary/40 accent-border scale-125"></div>` : '';
-        const glowStyle = isPerfect ? `style="box-shadow: 0 0 15px var(--accent-color);"` : '';
+        const glowStyle = isRestDay
+            ? `style="box-shadow: 0 0 15px rgba(251,191,36,0.45);"`
+            : (isPerfect ? `style="box-shadow: 0 0 15px var(--accent-color);"` : '');
 
         return `
         <div class="flex flex-col items-center gap-2 flex-shrink-0 min-w-[40px]">
@@ -97,7 +108,7 @@ export function getDashboardHTML({
             <section class="space-y-6">
                 <!-- Weekly Snap Card -->
                 <div class="bg-surface-container-low rounded-3xl p-6 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-16 -mt-16 accent-bg opacity-10"></div>
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-400/10 blur-3xl -mr-16 -mt-16 opacity-20"></div>
                     <div class="flex justify-between items-end mb-6">
                         <div>
                             <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant mb-1 block font-headline">Snap Semanal</span>
@@ -107,25 +118,25 @@ export function getDashboardHTML({
                     
                     <div class="flex justify-between items-center relative mt-4">
                         <div class="flex flex-wrap justify-between gap-y-6 gap-x-2 w-full pb-2 px-1">
-                            ${weekData.map(d => generateRing(d.day, d.state, d.pct)).join('')}
+                            ${weekData.map(d => generateRing(d.day, d.state, d.pct, d.isRestDay)).join('')}
                         </div>
                     </div>
                 </div>
 
                 <!-- Finance Card -->
                 <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-surface-container rounded-3xl p-6 border border-white/5 cursor-pointer active:scale-95 transition-transform" onclick="window.openFinanceModal('dia')">
-                        <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant block mb-2 font-headline">Dia a Dia</span>
+                    <div class="bg-amber-400/5 rounded-3xl p-6 border border-amber-300/20 opacity-90">
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-amber-200/80 block mb-2 font-headline">Dia a Dia</span>
                         <div class="flex items-baseline gap-1">
-                            <span class="text-sm font-medium text-on-surface-variant">R$</span>
-                            <span class="text-3xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">0,00</span>
+                            <span class="text-sm font-medium text-amber-200/70">R$</span>
+                            <span class="block w-full max-w-full truncate text-[clamp(1.1rem,4.8vw,1.85rem)] font-extrabold tracking-tighter text-[var(--text-primary)] font-headline" title="R$ ${formatCurrency(balances?.diaBalance)}">${formatCurrency(balances?.diaBalance)}</span>
                         </div>
                     </div>
-                    <div class="bg-primary/10 rounded-3xl p-6 border border-primary/20 accent-border cursor-pointer active:scale-95 transition-transform" onclick="window.openFinanceModal('geral')">
-                        <span class="text-[10px] font-bold tracking-widest uppercase text-primary accent-text block mb-2 font-headline">Meu Dinheiro</span>
+                    <div class="bg-emerald-400/10 rounded-3xl p-6 border border-emerald-300/25 opacity-90">
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-emerald-200 block mb-2 font-headline">Meu Dinheiro</span>
                         <div class="flex items-baseline gap-1">
-                            <span class="text-sm font-medium text-primary/70 accent-text">R$</span>
-                            <span class="text-3xl font-extrabold tracking-tighter text-[var(--text-primary)] font-headline">${finances.balance.toFixed(2)}</span>
+                            <span class="text-sm font-medium text-emerald-200/80">R$</span>
+                            <span class="block w-full max-w-full truncate text-[clamp(1.1rem,4.8vw,1.85rem)] font-extrabold tracking-tighter text-[var(--text-primary)] font-headline" title="R$ ${formatCurrency(balances?.dinheiroBalance)}">${formatCurrency(balances?.dinheiroBalance)}</span>
                         </div>
                     </div>
                 </div>
@@ -278,11 +289,17 @@ export function getDashboardHTML({
 
                     <!-- Hábitos Base -->
                     <section class="space-y-4">
+                        <div class="flex items-center justify-between gap-3 px-2">
+                            <button id="rest-day-toggle-checkin" data-active="false" onclick="window.toggleRestDay()" class="w-full h-12 rounded-2xl border border-white/10 bg-surface-highest text-on-surface-variant font-bold text-sm transition-all active:scale-95">
+                                Dia de Descanso
+                            </button>
+                            <span id="rest-day-badge-checkin" class="hidden flex-shrink-0 px-3 py-2 rounded-xl bg-amber-400/20 border border-amber-300/30 text-amber-200 text-[10px] font-extrabold uppercase tracking-widest">Descanso</span>
+                        </div>
                         <div class="flex justify-between items-center pl-2 pr-1">
                             <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70">As 8 Rotinas</h3>
                             <span class="text-[10px] font-bold text-primary accent-text" id="lbl-habit-counter">0/8</span>
                         </div>
-                        <div class="bg-surface-container rounded-[32px] p-2 space-y-1 border border-white/5">
+                        <div id="checkin-habits-section" class="bg-surface-container rounded-[32px] p-2 space-y-1 border border-white/5 transition-opacity">
                             ${DEFAULT_HABITS.map((h, i) => {
                                 const isChecked = todayLog.habits ? todayLog.habits[h.id] : false;
                                 return `

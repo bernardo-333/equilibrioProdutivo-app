@@ -83,7 +83,7 @@ export const DB = {
     const today = getTodayStr();
     const snap = await DB.getRef(`daily_logs/${today}`).once('value');
     if (!snap.exists()) {
-      const blank = { habits: {}, mood: null, sleep: null, water: 0, screen_time: 0, instagram: 0 };
+      const blank = { habits: {}, mood: null, sleep: null, water: 0, screen_time: 0, instagram: 0, rest_day: false };
       await DB.getRef(`daily_logs/${today}`).set(blank);
       return blank;
     }
@@ -105,48 +105,16 @@ export const DB = {
   },
 
   updateDailyFinances: async (dateStr, payload) => {
-    // 1. Atualizar o log do dia pra manter a state (os 4 inputs)
-    const logRef = DB.getRef(`daily_logs/${dateStr}`);
-    await logRef.update(payload);
-
-    // 2. Atualizar a timeline Global de transaÃ§Ãµes para bater o Saldo Resumo
-    const financesRef = DB.getRef('finances');
-    const snap = await financesRef.once('value');
-    const finances = snap.val() || { transactions: [], balance: 0 };
-    
-    let trans = finances.transactions || [];
-    let balance = Number(finances.balance || 0);
-
-    // Encontrar transaÃ§Ãµes aninhadas do "Dia" e revertÃª-las no saldo para limpar (Overwrite behavior)
-    const oldTrans = trans.filter(t => t.description === 'Registro Diario' && (t.date || '').startsWith(dateStr));
-    oldTrans.forEach(t => {
-       // sÃ³ reverte balance se for da conta "Meu Dinheiro", assumindo que a do Dia a Dia nÃ£o afeta "balance" principal e sim transaÃ§Ãµes isoladas.
-       // na dÃºvida, revertemos de volta o balance para Meu Dinheiro:
-       if (t.category === 'ganho_dinheiro') balance -= Number(t.amount);
-       if (t.category === 'gasto_dinheiro') balance += Number(t.amount);
-    });
-
-    // Filtra array original, deletando as "oldTrans"
-    trans = trans.filter(t => !(t.description === 'Registro Diario' && (t.date || '').startsWith(dateStr)));
-
-    const createDateStamp = () => new Date(dateStr + "T12:00:00").toISOString();
-
-    const addT = (amt, type, cat) => {
-      if (amt && amt > 0) {
-        trans.push({ id: DB.generateId(), type: type, amount: Math.abs(amt), description: 'Registro Diario', category: cat, date: createDateStamp() });
-        // atualiza global apenas carteira "dinheiro" pra nÃ£o somar dia a dia repetindo dados fÃ­sicos
-        if (cat === 'ganho_dinheiro') balance += Math.abs(amt);
-        if (cat === 'gasto_dinheiro') balance -= Math.abs(amt);
-      }
+    // Mantem os 4 campos financeiros no daily_logs de forma deterministica.
+    const cleanPayload = {
+      income_dia: Number(payload?.income_dia || 0),
+      expense_dia: Number(payload?.expense_dia || 0),
+      income_din: Number(payload?.income_din || 0),
+      expense_din: Number(payload?.expense_din || 0)
     };
 
-    addT(payload.income_dia, 'income', 'ganho_dia');
-    addT(payload.expense_dia, 'expense', 'gasto_dia');
-    addT(payload.income_din, 'income', 'ganho_dinheiro');
-    addT(payload.expense_din, 'expense', 'gasto_dinheiro');
-
-    // Salva back ao Firebase
-    await financesRef.update({ balance, transactions: trans });
+    const logRef = DB.getRef(`daily_logs/${dateStr}`);
+    await logRef.update(cleanPayload);
   },
   getMonthlyLogs: async (yearMonth) => {
     // Busca logs diários que começam com o ano/mês "YYYY-MM"
@@ -157,6 +125,11 @@ export const DB = {
   getDailyLog: async (dateStr) => {
     const snap = await DB.getRef(`daily_logs/${dateStr}`).once('value');
     return snap.exists() ? snap.val() : null;
+  },
+
+  getAllDailyLogs: async () => {
+    const snap = await DB.getRef('daily_logs').once('value');
+    return snap.exists() ? snap.val() : {};
   },
 
   // -- Finance --

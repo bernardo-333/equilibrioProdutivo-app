@@ -14,6 +14,7 @@ const TOTAL_CHECKINS = HABITS.length;
 
 function calcDayPct(log) {
     if (!log) return 0;
+    if (log.rest_day) return 100;
     let c = 0;
     const habits = log.habits || {};
     for (const h of HABITS) { if (habits[h.id]) c++; }
@@ -48,11 +49,13 @@ export async function renderPlanner() {
         const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
         const log = monthLogs[ds];
         const pct = calcDayPct(log);
+        const isRestDay = !!(log && log.rest_day);
         let level = 0;
-        if (pct > 0 && pct <= 33) level = 1;
+        if (isRestDay) level = 4;
+        else if (pct > 0 && pct <= 33) level = 1;
         else if (pct > 33 && pct <= 66) level = 2;
         else if (pct > 66) level = 3;
-        calendarData.push({ day: d, level, isFuture: d > todayDate });
+        calendarData.push({ day: d, level, isFuture: d > todayDate, isRestDay });
     }
 
     // History days (most recent first, only days with data)
@@ -76,6 +79,7 @@ export async function renderPlanner() {
             expense_dia: log.expense_dia || 0,
             income_din: log.income_din || 0,
             expense_din: log.expense_din || 0,
+            restDay: !!log.rest_day,
             habits
         });
     }
@@ -84,7 +88,7 @@ export async function renderPlanner() {
 
     // Calculate real metrics
     const logsArr = Object.values(monthLogs);
-    const perfectDays = logsArr.filter(l => calcDayPct(l) === 100).length;
+    const perfectDays = logsArr.filter(l => calcDayPct(l) === 100 && !l.rest_day).length;
 
     const sleepLabels = { 'perfeito': 5, 'muito_bom': 4, 'bom': 3, 'mais_ou_menos': 2, 'ruim': 1 };
     const sleepReverse = { 5: 'perfeito', 4: 'muito_bom', 3: 'bom', 2: 'mais_ou_menos', 1: 'ruim' };
@@ -99,14 +103,18 @@ export async function renderPlanner() {
     const avgSleep = sleepCount > 0 ? sleepReverse[Math.round(sleepSum / sleepCount)] || 'bom' : '—';
     const avgMood = moodCount > 0 ? moodReverse[Math.round(moodSum / moodCount)] || 'normal' : '—';
 
-    const finances = await DB.getFinances();
+    const monthlyTotals = logsArr.reduce((acc, log) => {
+        acc.totalGastoDia += Number(log.expense_dia || 0);
+        acc.totalGastoDinheiro += Number(log.expense_din || 0);
+        return acc;
+    }, { totalGastoDia: 0, totalGastoDinheiro: 0 });
 
     const metrics = {
         perfectDays,
         avgSleep,
         avgMood,
-        totalGastoDia: (finances.transactions || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
-        totalGastoDinheiro: finances.balance || 0
+        totalGastoDia: monthlyTotals.totalGastoDia,
+        totalGastoDinheiro: monthlyTotals.totalGastoDinheiro
     };
 
     root.innerHTML = getPlannerHTML({ calendarData, historyDays, metrics, kanbanData });
@@ -134,7 +142,7 @@ window.openDailyDetail = (date, isEditMode = false) => {
     const content = document.getElementById('day-detail-content');
 
     document.getElementById('lbl-day-title').innerText = displayDate;
-    document.getElementById('lbl-day-pct').innerText = `${day.pct}% Concluído`;
+    document.getElementById('lbl-day-pct').innerText = day.restDay ? 'Dia de Descanso' : `${day.pct}% Concluído`;
 
     const moodLabels = { nervoso:'Nervoso', feliz:'Feliz', produtivo:'Produtivo', normal:'Normal', ansioso:'Ansioso', cansado:'Cansado', triste:'Triste' };
     const moodClasses = {
@@ -164,6 +172,19 @@ window.openDailyDetail = (date, isEditMode = false) => {
     }).join('');
 
     content.innerHTML = `
+        <section class="space-y-4">
+            <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} pl-2">Dia</h3>
+            <div class="bg-surface-container-highest rounded-3xl p-4 border border-white/5 flex items-center justify-between gap-3">
+                <div>
+                    <p class="font-bold text-[var(--text-primary)]">Dia de Descanso</p>
+                    <p class="text-xs text-on-surface-variant">Não exige marcação das 8 rotinas.</p>
+                </div>
+                ${isEditMode
+                    ? `<button onclick="window.setRestDayForDate('${rawDate}', ${!day.restDay})" class="px-4 py-2 rounded-xl border font-bold text-xs uppercase tracking-widest transition-all ${day.restDay ? 'bg-amber-400/20 border-amber-300/40 text-amber-200' : 'bg-surface-highest border-white/10 text-on-surface-variant'}">${day.restDay ? 'Ativo' : 'Inativo'}</button>`
+                    : `<span class="px-3 py-2 rounded-xl border font-extrabold text-[10px] uppercase tracking-widest ${day.restDay ? 'bg-amber-400/20 border-amber-300/40 text-amber-200' : 'bg-surface-highest border-white/10 text-on-surface-variant'}">${day.restDay ? 'Descanso' : 'Normal'}</span>`}
+            </div>
+        </section>
+
         <section class="space-y-4">
             <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} pl-2 flex items-center gap-2">
                 Como você se sentiu? ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
@@ -286,13 +307,18 @@ window.openDailyDetail = (date, isEditMode = false) => {
                 <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} flex items-center gap-2">
                     As 8 Rotinas ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
                 </h3>
-                <span class="text-[10px] font-bold text-primary accent-text">${day.habits.filter(h=>h.done).length}/${day.habits.length}</span>
+                <span class="text-[10px] font-bold ${day.restDay ? 'text-amber-300' : 'text-primary accent-text'}">${day.restDay ? 'Descanso' : `${day.habits.filter(h=>h.done).length}/${day.habits.length}`}</span>
             </div>
             <div class="bg-surface-container rounded-[32px] p-2 space-y-1 border border-white/5">
+                ${day.restDay ? `
+                    <div class="p-4 rounded-2xl bg-amber-400/10 border border-amber-300/20 text-amber-200 text-sm font-bold text-center">
+                        Dia de descanso ativo. Rotinas não são obrigatórias hoje.
+                    </div>
+                ` : ''}
                 ${day.habits.map(h => {
                     if (isEditMode) {
                         return `
-                        <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : ''} transition-colors cursor-pointer group active:scale-[0.98]" onclick="window.toggleHabitForDate('${rawDate}', '${h.id}', ${!h.done})">
+                        <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : ''} transition-colors cursor-pointer group active:scale-[0.98] ${day.restDay ? 'opacity-40 pointer-events-none' : ''}" onclick="window.toggleHabitForDate('${rawDate}', '${h.id}', ${!h.done})">
                             <div class="flex items-center gap-4">
                                 <div class="w-10 h-10 rounded-xl bg-surface-highest flex items-center justify-center">
                                     <span class="material-symbols-outlined text-lg ${h.done ? 'text-primary accent-text' : 'text-on-surface-variant group-hover:text-white'}" style="font-variation-settings: 'FILL' ${h.done ? 1 : 0};">task_alt</span>
@@ -343,11 +369,16 @@ window.openDailyDetail = (date, isEditMode = false) => {
 };
 
 window.toggleHabitForDate = async (date, habitId, isCompleted) => {
+    const day = window._plannerHistory.find(d => d.rawDate === date);
+    if (day?.restDay) {
+        alert('Dia de descanso ativo. Desative para editar hábitos.');
+        return;
+    }
+
     // 1. Update remote DB
     await DB.updateHabit(habitId, isCompleted, date);
     
     // 2. Update local state
-    const day = window._plannerHistory.find(d => d.rawDate === date);
     if (day) {
         const h = day.habits.find(hx => hx.id === habitId);
         if (h) h.done = isCompleted;
@@ -374,6 +405,16 @@ window.setWaterForDate = async (date, liters) => {
     window.openDailyDetail(date, true);
 };
 
+window.setRestDayForDate = async (date, isRestDay) => {
+    await DB.updateDailyMetrics('rest_day', isRestDay, date);
+    const day = window._plannerHistory.find(d => d.rawDate === date);
+    if (day) {
+        day.restDay = isRestDay;
+        day.pct = isRestDay ? 100 : Math.round((day.habits.filter(h => h.done).length / day.habits.length) * 100);
+    }
+    window.openDailyDetail(date, true);
+};
+
 window.saveAndCloseDailyDetail = async (date) => {
     // Busca os 4 campos se estiverem renderizados no HTML
     const incDiaId = document.getElementById('input-planner-dia-income');
@@ -396,8 +437,8 @@ window.saveAndCloseDailyDetail = async (date) => {
     window.closeDailyDetail();
     // Render Planner Completo (com os saldos reatualizados)
     setTimeout(() => {
-        window.renderPlanner();
-    }, 400); // aguarda a animaÃ§Ã£o de fechar iniciar
+        renderPlanner();
+    }, 550);
 };
 
 window.closeDailyDetail = () => {
@@ -450,7 +491,7 @@ let _viewingCard = null; // store current card for edit transition
 
 window.openKanbanView = (cardId) => {
     // Find card from all columns rendered on DOM
-    const cardEl = document.querySelector(`.kanban-card[data-id="${cardId}"]`);
+    const cardEl = document.querySelector(`.kanban-card[data-card-id="${cardId}"]`);
     // Build card object from data-attributes or window store
     const card = (window._kanbanAllCards || []).find(c => c.id === cardId) || {
         id: cardId,

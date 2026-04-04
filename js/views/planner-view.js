@@ -21,10 +21,10 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
         <div class="flex items-center justify-between py-4 px-2 border-b border-white/5 hover:bg-white/[0.02] active:bg-white/[0.05] transition-all cursor-pointer group" onclick="window.openDailyDetail('${day.date}')">
             <span class="text-sm font-bold text-[var(--text-primary)] tracking-tight w-20 capitalize whitespace-nowrap">${day.date}</span>
             <div class="flex-1 max-w-[120px] h-2 bg-surface-highest rounded-full overflow-hidden border border-white/5 mx-4">
-                <div class="h-full bg-primary accent-bg transition-all duration-1000" style="width: ${day.pct}%"></div>
+                <div class="h-full ${day.restDay ? 'bg-amber-300' : 'bg-primary accent-bg'} transition-all duration-1000" style="width: ${day.pct}%"></div>
             </div>
             <div class="flex items-center gap-3">
-                <span class="text-[10px] font-extrabold text-on-surface-variant/40 tracking-widest uppercase">${day.pct}%</span>
+                <span class="text-[10px] font-extrabold ${day.restDay ? 'text-amber-300' : 'text-on-surface-variant/40'} tracking-widest uppercase">${day.restDay ? 'Descanso' : `${day.pct}%`}</span>
                 <span class="material-symbols-outlined text-on-surface-variant/20 group-hover:text-primary transition-colors text-lg">chevron_right</span>
             </div>
         </div>
@@ -45,10 +45,12 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
             case 1: levelClasses = 'bg-primary/25 opacity-50'; break;
             case 2: levelClasses = 'bg-primary/55 opacity-90 shadow-[0_0_6px_var(--accent-color)]'; break;
             case 3: levelClasses = 'bg-primary accent-bg shadow-[0_0_14px_var(--accent-color)]'; break;
+            case 4: levelClasses = 'bg-amber-200/70 border border-amber-200/35'; break;
         }
         const todayRing = isToday ? 'ring-2 ring-primary/80 accent-border scale-105' : '';
-        const textColor = d.level === 3 ? 'text-black/70' : d.level >= 2 ? 'text-white/70' : 'text-white/25';
-        return `<div title="Dia ${d.day}" class="aspect-square w-full rounded-lg ${levelClasses} ${todayRing} flex items-center justify-center text-[9px] font-extrabold ${textColor} select-none transition-all duration-200 cursor-pointer hover:scale-110 hover:brightness-125">${d.day}</div>`;
+        const textColor = d.level === 4 ? 'text-amber-900/70' : d.level === 3 ? 'text-black/70' : d.level >= 2 ? 'text-white/70' : 'text-white/25';
+        const perfectMarker = d.level === 3 ? '<span class="absolute top-1 right-1 material-symbols-outlined text-[10px] text-black/65" style="font-variation-settings: \'FILL\' 1;">task_alt</span>' : '';
+        return `<div title="Dia ${d.day}" class="aspect-square w-full rounded-lg ${levelClasses} ${todayRing} relative flex items-center justify-center text-[9px] font-extrabold ${textColor} select-none transition-all duration-200 cursor-pointer hover:scale-110 hover:brightness-125">${d.day}${perfectMarker}</div>`;
     }).join('');
 
     const initialRows = historyDays.slice(0, 6).map(day => getCompactRow(day)).join('');
@@ -58,7 +60,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
 
             <!-- Calendário e Métricas Integradas -->
             <section class="bg-surface-container-low rounded-[40px] p-6 border border-white/5 shadow-2xl relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-72 h-72 bg-primary/5 blur-[100px] -mr-36 -mt-36 accent-bg opacity-30 pointer-events-none"></div>
+                <div class="absolute top-0 right-0 w-72 h-72 bg-emerald-400/10 blur-[100px] -mr-36 -mt-36 opacity-30 pointer-events-none"></div>
 
                 <!-- Header da Seção -->
                 <div class="flex items-center justify-between mb-5 px-1">
@@ -88,9 +90,11 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                         <div class="w-4 h-4 rounded-sm bg-white/[0.04]"></div>
                         <div class="w-4 h-4 rounded-sm bg-primary/25 opacity-50"></div>
                         <div class="w-4 h-4 rounded-sm bg-primary/55 opacity-90"></div>
-                        <div class="w-4 h-4 rounded-sm bg-primary accent-bg"></div>
+                        <div class="w-4 h-4 rounded-sm bg-primary accent-bg relative"><span class="material-symbols-outlined text-[8px] text-black/70 absolute inset-0 flex items-center justify-center" style="font-variation-settings: 'FILL' 1;">task_alt</span></div>
+                        <div class="w-4 h-4 rounded-sm bg-amber-300"></div>
                     </div>
                     <span class="text-[9px] font-bold text-primary accent-text uppercase tracking-widest">100%</span>
+                    <span class="text-[9px] font-bold text-amber-300 uppercase tracking-widest">Descanso</span>
                 </div>
 
                 <!-- Divisória elegante -->
@@ -101,7 +105,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                     <div class="grid grid-cols-3 gap-3">
                         <div class="bg-surface-highest/40 rounded-[22px] p-4 border border-white/5 text-center">
                             <span class="text-[9px] uppercase font-bold text-on-surface-variant/60 tracking-widest mb-1.5 block">Perfeitos</span>
-                            <div class="text-2xl font-extrabold tracking-tighter text-primary accent-text font-headline leading-none">${metrics.perfectDays}</div>
+                            <div class="text-2xl font-extrabold tracking-tighter text-emerald-300 font-headline leading-none">${metrics.perfectDays}</div>
                             <div class="text-[9px] text-on-surface-variant/40 font-bold mt-0.5">dias</div>
                         </div>
                         <div class="bg-surface-highest/40 rounded-[22px] p-3 flex flex-col items-center justify-center border border-white/5 text-center gap-1.5">
@@ -138,7 +142,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
             <section class="space-y-4">
                 <div class="flex justify-between items-center px-1">
                     <h3 class="text-xl font-extrabold text-[var(--text-primary)] font-headline tracking-tighter leading-none">Diário de <span class="text-on-surface-variant">Bordo</span></h3>
-                    <span class="text-[10px] text-primary accent-text font-bold uppercase tracking-widest bg-primary/10 px-3 py-1 rounded-full">Abril</span>
+                    <span class="text-[10px] text-cyan-300 font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded-full">Abril</span>
                 </div>
                 
                 <div class="bg-surface-container-low rounded-[32px] p-2 border border-white/5 flex flex-col">
@@ -153,7 +157,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
             <section class="space-y-4 pt-6">
                  <div class="flex justify-between items-end px-2 mb-2">
                     <h3 class="text-xl font-extrabold text-[var(--text-primary)] font-headline tracking-tighter leading-none">Brain <span class="text-on-surface-variant">Kanban</span></h3>
-                    <button class="w-10 h-10 rounded-full bg-surface-highest flex items-center justify-center text-on-surface-variant border border-white/5 hover:text-primary active:scale-90 transition-all" onclick="window.openKanbanForm()">
+                    <button class="w-10 h-10 rounded-full bg-surface-highest flex items-center justify-center text-on-surface-variant border border-white/5 hover:text-emerald-300 active:scale-90 transition-all" onclick="window.openKanbanForm()">
                         <span class="material-symbols-outlined text-lg font-bold">add</span>
                     </button>
                  </div>
