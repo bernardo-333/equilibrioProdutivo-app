@@ -118,3 +118,45 @@ h1, h2, h3, h4, .font-headline {
   border-color: rgba(248, 113, 113, 0.4);
   background: rgba(127, 29, 29, 0.35);
 }
+
+@media (min-width: 1024px) {
+  body {
+    background:
+      radial-gradient(900px 450px at 10% -10%, rgba(59, 130, 246, 0.12), transparent 60%),
+      radial-gradient(900px 450px at 90% 110%, rgba(16, 185, 129, 0.10), transparent 60%),
+      var(--bg-color);
+    padding-bottom: 2rem;
+  }
+
+  #main-header {
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: min(1120px, calc(100vw - 48px));
+    top: 16px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  #app-container {
+    max-width: 1120px;
+    margin-top: 120px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  #bottom-nav {
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: min(1120px, calc(100vw - 48px));
+    bottom: 16px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 12px;
+  }
+
+  .app-toast-host {
+    bottom: 104px;
+  }
+}
