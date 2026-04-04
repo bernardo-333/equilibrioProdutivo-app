@@ -115,19 +115,23 @@ export async function renderPlanner() {
 
 // ----- DAILY DETAIL LOGIC -----
 
-window.openDailyDetail = (date) => {
-    const day = window._plannerHistory.find(d => d.date === date);
+window.openDailyDetail = (date, isEditMode = false) => {
+    // Busca novamente do history (que pode ou não estar atualizado dependendo se ele acabou de editar)
+    let day = window._plannerHistory.find(d => d.date === date || d.rawDate === date);
     if (!day) return;
+    
+    // Fallback pra date caso seja chamado com rawDate
+    const displayDate = day.date || date;
+    const rawDate = day.rawDate || date;
 
     const modal = document.getElementById('day-detail-modal');
     const overlay = document.getElementById('day-detail-overlay');
     const sheet = document.getElementById('day-detail-sheet');
     const content = document.getElementById('day-detail-content');
 
-    document.getElementById('lbl-day-title').innerText = day.date;
+    document.getElementById('lbl-day-title').innerText = displayDate;
     document.getElementById('lbl-day-pct').innerText = `${day.pct}% Concluído`;
 
-    // Populate content — visual identical to Check-in modal
     const moodLabels = { nervoso:'Nervoso', feliz:'Feliz', produtivo:'Produtivo', normal:'Normal', ansioso:'Ansioso', cansado:'Cansado', triste:'Triste' };
     const moodClasses = {
         nervoso: 'border-red-500 bg-red-500/20 text-red-500',
@@ -148,53 +152,58 @@ window.openDailyDetail = (date) => {
     };
 
     const waterFilled = Math.round(day.water);
-    const waterDrops = [1,2,3,4,5].map(i =>
-        `<button onclick="window.setWaterForDate('${day.rawDate}', ${i})" class="text-4xl transition-all duration-300 ${i <= waterFilled ? 'drop-shadow-[0_0_15px_rgba(34,211,238,0.6)] filter-none' : 'grayscale opacity-30'} hover:scale-110 active:scale-90">💧</button>`
-    ).join('');
+    const waterDrops = [1,2,3,4,5].map(i => {
+        if (isEditMode) {
+             return `<button onclick="window.setWaterForDate('${rawDate}', ${i})" class="text-4xl transition-all duration-300 ${i <= waterFilled ? 'drop-shadow-[0_0_15px_rgba(34,211,238,0.6)] filter-none' : 'grayscale opacity-30'} hover:scale-110 active:scale-90">💧</button>`;
+        }
+        return `<span class="text-4xl transition-all duration-300 ${i <= waterFilled ? 'drop-shadow-[0_0_15px_rgba(34,211,238,0.6)]' : 'grayscale opacity-30'}">💧</span>`;
+    }).join('');
 
     content.innerHTML = `
-        <!-- Seção 1: Como você se sentiu (interativo) -->
         <section class="space-y-4">
-            <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Como você se sentiu?</h3>
+            <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} pl-2 flex items-center gap-2">
+                Como você se sentiu? ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
+            </h3>
             <div class="bg-surface-container-highest rounded-3xl p-5 border border-white/5 space-y-6">
 
-                <!-- Humor chips -->
+                <!-- Humor -->
                 <div class="space-y-3">
                     <span class="text-sm font-bold text-[var(--text-primary)] block">Humor Geral</span>
                     <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width:none;">
-                        ${Object.keys(moodLabels).map(key => `
-                            <button onclick="window.setQualitativeForDate('${day.rawDate}', 'mood', '${key}')" class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
-                                ${key === day.mood
-                                    ? moodClasses[key] + ' opacity-100'
-                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30 hover:opacity-100'
-                                }">${moodLabels[key]}</button>
-                        `).join('')}
+                        ${Object.keys(moodLabels).map(key => {
+                            const active = key === day.mood;
+                            if (isEditMode) {
+                                return `<button onclick="window.setQualitativeForDate('${rawDate}', 'mood', '${key}')" class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all ${active ? moodClasses[key] + ' opacity-100' : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30 hover:opacity-100'}">${moodLabels[key]}</button>`;
+                            }
+                            return `<span class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all ${active ? moodClasses[key] : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30'}">${moodLabels[key]}</span>`;
+                        }).join('')}
                     </div>
                 </div>
 
                 <div class="h-px w-full bg-white/5"></div>
 
-                <!-- Sono chips -->
+                <!-- Sono -->
                 <div class="space-y-3">
                     <span class="text-sm font-bold text-[var(--text-primary)] block">Qualidade do Sono</span>
                     <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width:none;">
-                        ${Object.keys(sleepLabels).map(key => `
-                            <button onclick="window.setQualitativeForDate('${day.rawDate}', 'sleep', '${key}')" class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all
-                                ${key === day.sleep
-                                    ? sleepClasses[key] + ' opacity-100'
-                                    : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30 hover:opacity-100'
-                                }">${sleepLabels[key]}</button>
-                        `).join('')}
+                        ${Object.keys(sleepLabels).map(key => {
+                            const active = key === day.sleep;
+                            if (isEditMode) {
+                                return `<button onclick="window.setQualitativeForDate('${rawDate}', 'sleep', '${key}')" class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all ${active ? sleepClasses[key] + ' opacity-100' : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30 hover:opacity-100'}">${sleepLabels[key]}</button>`;
+                            }
+                            return `<span class="flex-shrink-0 px-5 py-2.5 rounded-2xl border text-sm font-bold transition-all ${active ? sleepClasses[key] : 'border-transparent bg-surface-highest text-on-surface-variant opacity-30'}">${sleepLabels[key]}</span>`;
+                        }).join('')}
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Seção 2: Corpo e Tempo -->
+        <!-- Corpo e Tempo -->
         <section class="space-y-4">
-            <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Seu corpo e tempo</h3>
+            <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} pl-2 flex items-center gap-2">
+                Seu corpo e tempo ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
+            </h3>
             <div class="grid grid-cols-2 gap-4">
-                <!-- Água -->
                 <div class="col-span-2 bg-surface-container rounded-3xl p-5 border border-white/5 flex flex-col items-center gap-4">
                     <span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest text-center">Água Consumida (1 Gota = 1 Litro)</span>
                     <div class="flex items-center gap-3">
@@ -205,65 +214,98 @@ window.openDailyDetail = (date) => {
             </div>
         </section>
 
-        <!-- Seção 3: As 8 Rotinas (interativo) -->
+        <!-- As 8 Rotinas -->
         <section class="space-y-4">
             <div class="flex justify-between items-center pl-2 pr-1">
-                <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70">As 8 Rotinas</h3>
+                <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} flex items-center gap-2">
+                    As 8 Rotinas ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
+                </h3>
                 <span class="text-[10px] font-bold text-primary accent-text">${day.habits.filter(h=>h.done).length}/${day.habits.length}</span>
             </div>
             <div class="bg-surface-container rounded-[32px] p-2 space-y-1 border border-white/5">
-                ${day.habits.map(h => `
-                    <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : ''} transition-colors cursor-pointer group active:scale-[0.98]" onclick="window.toggleHabitForDate('${day.rawDate}', '${h.id}', ${!h.done})">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-surface-highest flex items-center justify-center">
-                                <span class="material-symbols-outlined text-lg ${h.done ? 'text-primary accent-text' : 'text-on-surface-variant group-hover:text-white'}" style="font-variation-settings: 'FILL' ${h.done ? 1 : 0};">task_alt</span>
+                ${day.habits.map(h => {
+                    if (isEditMode) {
+                        return `
+                        <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : ''} transition-colors cursor-pointer group active:scale-[0.98]" onclick="window.toggleHabitForDate('${rawDate}', '${h.id}', ${!h.done})">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-xl bg-surface-highest flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-lg ${h.done ? 'text-primary accent-text' : 'text-on-surface-variant group-hover:text-white'}" style="font-variation-settings: 'FILL' ${h.done ? 1 : 0};">task_alt</span>
+                                </div>
+                                <span class="text-base font-bold transition-all ${h.done ? 'line-through opacity-50 text-on-surface-variant' : 'text-[var(--text-primary)]'}">${h.name}</span>
                             </div>
-                            <span class="text-base font-bold transition-all ${h.done ? 'line-through opacity-50 text-on-surface-variant' : 'text-[var(--text-primary)]'}">${h.name}</span>
-                        </div>
-                        <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all
-                            ${h.done ? 'bg-primary accent-bg border-primary accent-border' : 'border-on-surface-variant/30 group-hover:border-white/40'}">
-                            ${h.done ? '<span class="material-symbols-outlined text-black font-bold mix-blend-color-burn" style="font-size:16px;">check</span>' : ''}
-                        </div>
-                    </div>
-                `).join('')}
+                            <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${h.done ? 'bg-primary accent-bg border-primary accent-border' : 'border-on-surface-variant/30 group-hover:border-white/40'}">
+                                ${h.done ? '<span class="material-symbols-outlined text-black font-bold mix-blend-color-burn" style="font-size:16px;">check</span>' : ''}
+                            </div>
+                        </div>`;
+                    }
+                    // VIEW MODE UI FOR HABITS
+                    return `
+                        <div class="flex items-center justify-between p-3 rounded-2xl ${h.done ? 'bg-surface-highest/50' : 'opacity-60'} transition-colors">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-xl bg-surface-highest flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-lg ${h.done ? 'text-primary accent-text' : 'text-on-surface-variant'}" style="font-variation-settings: 'FILL' ${h.done ? 1 : 0};">task_alt</span>
+                                </div>
+                                <span class="text-base font-bold transition-all ${h.done ? 'line-through text-on-surface-variant' : 'text-on-surface-variant'}">${h.name}</span>
+                            </div>
+                            ${h.done ? '<div class="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center"><span class="material-symbols-outlined text-primary accent-text font-bold" style="font-size:16px;">check</span></div>' : ''}
+                        </div>`;
+                }).join('')}
             </div>
         </section>
 
-        <!-- Footer Button -->
-        <button onclick="window.closeDailyDetail();" class="w-full h-16 rounded-[24px] bg-primary accent-bg text-black font-extrabold text-lg shadow-xl active:scale-95 transition-transform mt-6">
-            Concluir Edição
+        <!-- Footer Buttons -->
+        ${isEditMode ? `
+        <button onclick="window.closeDailyDetail(); window.renderPlanner();" class="w-full h-16 rounded-[24px] bg-primary accent-bg text-black font-extrabold text-lg shadow-xl active:scale-95 transition-transform mt-6">
+            Salvar e Concluir
         </button>
+        ` : `
+        <button onclick="window.openDailyDetail('${rawDate}', true);" class="w-full h-16 rounded-[24px] bg-surface-highest border border-white/10 text-[var(--text-primary)] font-bold text-lg active:scale-95 transition-transform mt-6 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined">edit</span> Editar Dia
+        </button>
+        `}
     `;
 
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    requestAnimationFrame(() => {
-        overlay.classList.remove('opacity-0');
-        sheet.classList.remove('translate-y-full');
-    });
+    // Only un-hide the modal if it's not currently open
+    if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        requestAnimationFrame(() => {
+            overlay.classList.remove('opacity-0');
+            sheet.classList.remove('translate-y-full');
+        });
+    }
 };
 
 window.toggleHabitForDate = async (date, habitId, isCompleted) => {
+    // 1. Update remote DB
     await DB.updateHabit(habitId, isCompleted, date);
-    // Re-open/refresh modal to show change visually
-    const history = await DB.getMonthlyLogs(date.substring(0, 7));
-    // We need to find the day in our internal list again to render it
-    // Or just re-render the whole planner and re-open modal. 
-    // For simplicity, let's re-render planner and reopen the modal.
-    await renderPlanner();
-    window.openDailyDetail(date);
+    
+    // 2. Update local state
+    const day = window._plannerHistory.find(d => d.rawDate === date);
+    if (day) {
+        const h = day.habits.find(hx => hx.id === habitId);
+        if (h) h.done = isCompleted;
+        // recalculate simple local pct just for UI update speed
+        let doneCount = day.habits.filter(hx => hx.done).length;
+        day.pct = Math.round((doneCount / day.habits.length) * 100);
+    }
+    
+    // 3. Immediately re-paint interior
+    window.openDailyDetail(date, true);
 };
 
 window.setQualitativeForDate = async (date, type, value) => {
     await DB.updateDailyMetrics(type, value, date);
-    await renderPlanner();
-    window.openDailyDetail(date);
+    const day = window._plannerHistory.find(d => d.rawDate === date);
+    if (day) day[type] = value;
+    window.openDailyDetail(date, true);
 };
 
 window.setWaterForDate = async (date, liters) => {
     await DB.updateDailyMetrics('water', liters, date);
-    await renderPlanner();
-    window.openDailyDetail(date);
+    const day = window._plannerHistory.find(d => d.rawDate === date);
+    if (day) day.water = liters;
+    window.openDailyDetail(date, true);
 };
 
 window.closeDailyDetail = () => {
@@ -276,7 +318,7 @@ window.closeDailyDetail = () => {
     setTimeout(() => {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
-    }, 500);
+    }, 500); // UI closes securely
 };
 
 window.editSpecificDay = () => {
