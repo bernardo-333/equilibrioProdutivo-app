@@ -695,8 +695,8 @@ window.saveKanbanForm = async () => {
         kanbanData[col] = kanbanData[col].filter(c => c.id !== card.id);
     });
 
-    // Add to the correct column
-    kanbanData[progress].push(card);
+    // Add to the top of the target column
+    kanbanData[progress].unshift(card);
 
     await DB.saveKanbanData(kanbanData);
     window.closeKanbanForm();
@@ -740,9 +740,9 @@ function initKanbanDragAndDrop() {
         col.addEventListener('drop', async function() {
             this.classList.remove('border-primary/50', 'bg-white/5');
             if (draggedItem) {
-                const emptyMsg = this.querySelector('p, .opacity-30');
+                const emptyMsg = this.querySelector('.kanban-empty-state');
                 if (emptyMsg) emptyMsg.remove();
-                this.appendChild(draggedItem);
+                this.prepend(draggedItem);
 
                 // Persist column move to DB
                 const cardId = draggedItem.dataset.cardId;
@@ -758,7 +758,7 @@ function initKanbanDragAndDrop() {
                     });
                     if (movedCard) {
                         if (!kanbanData[newColumn]) kanbanData[newColumn] = [];
-                        kanbanData[newColumn].push(movedCard);
+                        kanbanData[newColumn].unshift(movedCard);
                         await DB.saveKanbanData(kanbanData);
                     }
                 }

@@ -203,7 +203,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                             </h4>
                             <div class="kanban-column flex-1 bg-surface-container-low/50 backdrop-blur rounded-[32px] p-4 min-h-[350px] border border-white/5 space-y-3 shadow-inner" data-column="${id}">
                                 ${items.map(item => renderCard(item)).join('')}
-                                ${items.length === 0 ? '<div class="h-full flex items-center justify-center opacity-20 flex-col gap-2 mt-20"><span class="material-symbols-outlined text-4xl">inbox</span><p class="text-[10px] uppercase font-bold tracking-widest">Nada por aqui</p></div>' : ''}
+                                ${items.length === 0 ? '<div class="kanban-empty-state h-full flex items-center justify-center opacity-20 flex-col gap-2 mt-20"><span class="material-symbols-outlined text-4xl">inbox</span><p class="text-[10px] uppercase font-bold tracking-widest">Nada por aqui</p></div>' : ''}
                             </div>
                         </div>`;
                         
