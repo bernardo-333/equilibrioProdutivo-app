@@ -37,6 +37,13 @@ function calcDayPctFromLog(log) {
     return Math.round((habitsCompleted / ALL_HABITS.length) * 100);
 }
 
+function formatDateKeyLocal(dateObj = new Date()) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 export async function renderDashboard() {
     const root = document.getElementById('dashboard-root');
     try {
@@ -61,11 +68,9 @@ export async function renderDashboard() {
         // Build weekly snap from real data (last 5 weekdays)
         const dayNames = ['D','S','T','Q','Q','S','S'];
         const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = formatDateKeyLocal(now);
         const allLogs = await DB.getAllDailyLogs();
         const balances = getDashboardBalances(allLogs, todayStr);
-        const yearMonth = todayStr.substring(0, 7);
-        const monthLogs = await DB.getMonthlyLogs(yearMonth);
 
         // Find the current weekday position in Mon-Fri (0-4)
         const todayDow = now.getDay(); // 0=Sun .. 6=Sat
@@ -76,8 +81,8 @@ export async function renderDashboard() {
         const mondayOffset = todayDow === 0 ? -6 : -(todayDow - 1);
         d.setDate(d.getDate() + mondayOffset);
         for (let i = 0; i < 5; i++) {
-            const ds = d.toISOString().split('T')[0];
-            const log = monthLogs[ds];
+            const ds = formatDateKeyLocal(d);
+            const log = allLogs?.[ds];
             const pct = calcDayPctFromLog(log);
             const isRestDayLog = !!(log && log.rest_day);
             const state = ds === todayStr ? 'today' : (ds < todayStr ? 'past' : 'future');
@@ -220,7 +225,7 @@ window.closeCheckinModal = async () => {
             income_din: incDinId ? (parseFloat(incDinId.value) || 0) : 0,
             expense_din: expDinId ? (parseFloat(expDinId.value) || 0) : 0
         };
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = formatDateKeyLocal(new Date());
         updates.push(DB.updateDailyFinances(todayStr, payload));
     }
 
