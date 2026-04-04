@@ -85,6 +85,8 @@ export async function renderDashboard() {
             d.setDate(d.getDate() + 1);
         }
         const weekData = weekDays;
+        const weekProgressDays = weekData.filter(d => d.pct === 100 || d.isRestDay).length;
+        const weekProgressPct = weekData.length > 0 ? Math.round((weekProgressDays / weekData.length) * 100) : 0;
 
         // Dynamic snap message
         const perfectDaysCount = weekData.filter(d => d.pct === 100 && !d.isRestDay).length;
@@ -107,7 +109,7 @@ export async function renderDashboard() {
         }
         // Generate the dynamic view UI
         root.innerHTML = getDashboardHTML({ 
-            todayLog, balances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
+            todayLog, balances, todayPct, missing, isAllDone, weekData, weekProgressPct, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
         });
 
         // Ensure dynamic dom texts are synced

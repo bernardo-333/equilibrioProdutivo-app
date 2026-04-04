@@ -1,5 +1,5 @@
 export function getDashboardHTML({ 
-    todayLog, balances, todayPct, missing, isAllDone, weekData, DEFAULT_HABITS, snapMessage, libraryItems 
+    todayLog, balances, todayPct, missing, isAllDone, weekData, weekProgressPct = 0, DEFAULT_HABITS, snapMessage, libraryItems 
 }) {
     const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
@@ -107,18 +107,24 @@ export function getDashboardHTML({
             <!-- Weekly Snap & Finance Block -->
             <section class="space-y-6">
                 <!-- Weekly Snap Card -->
-                <div class="bg-surface-container-low rounded-3xl p-6 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-400/10 blur-3xl -mr-16 -mt-16 opacity-20"></div>
-                    <div class="flex justify-between items-end mb-6">
-                        <div>
-                            <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant mb-1 block font-headline">Snap Semanal</span>
-                            <p class="text-[var(--text-primary)] font-semibold tracking-tight">${snapMessage}</p>
+                <div class="relative rounded-3xl p-[2px] overflow-hidden" style="background: conic-gradient(from 180deg, rgba(255,255,255,0.10) 0deg, rgba(255,255,255,0.10) ${weekProgressPct * 3.6}deg, var(--accent-color) ${weekProgressPct * 3.6}deg, var(--accent-color) ${Math.min(weekProgressPct * 3.6 + 0.2, 360)}deg, rgba(255,255,255,0.06) ${Math.min(weekProgressPct * 3.6 + 0.2, 360)}deg, rgba(255,255,255,0.06) 360deg); box-shadow: 0 0 20px rgba(var(--accent-color-rgb, 114,254,143), 0.18);">
+                    <div class="bg-surface-container-low rounded-[22px] p-6 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-400/10 blur-3xl -mr-16 -mt-16 opacity-20"></div>
+                        <div class="flex justify-between items-end mb-6">
+                            <div>
+                                <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant mb-1 block font-headline">Snap Semanal</span>
+                                <p class="text-[var(--text-primary)] font-semibold tracking-tight">${snapMessage}</p>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 block">Semana</span>
+                                <span class="text-[10px] font-extrabold text-primary accent-text">${weekProgressPct}%</span>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="flex justify-between items-center relative mt-4">
-                        <div class="flex flex-wrap justify-between gap-y-6 gap-x-2 w-full pb-2 px-1">
-                            ${weekData.map(d => generateRing(d.day, d.state, d.pct, d.isRestDay)).join('')}
+                        
+                        <div class="flex justify-between items-center relative mt-4">
+                            <div class="flex flex-wrap justify-between gap-y-6 gap-x-2 w-full pb-2 px-1">
+                                ${weekData.map(d => generateRing(d.day, d.state, d.pct, d.isRestDay)).join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
