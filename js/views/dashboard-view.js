@@ -105,10 +105,13 @@ export function getDashboardHTML({
     return `
         <div class="space-y-8 pb-12">
             <!-- Weekly Snap & Finance Block -->
-            <section class="space-y-6">
+            <section class="space-y-6 pt-8 sm:pt-0 mt-2 sm:mt-0">
                 <!-- Weekly Snap Card -->
-                <div class="relative rounded-3xl p-[2px] overflow-hidden" style="background: conic-gradient(from 180deg, rgba(255,255,255,0.10) 0deg, rgba(255,255,255,0.10) ${weekProgressPct * 3.6}deg, var(--accent-color) ${weekProgressPct * 3.6}deg, var(--accent-color) ${Math.min(weekProgressPct * 3.6 + 0.2, 360)}deg, rgba(255,255,255,0.06) ${Math.min(weekProgressPct * 3.6 + 0.2, 360)}deg, rgba(255,255,255,0.06) 360deg); box-shadow: 0 0 20px rgba(var(--accent-color-rgb, 114,254,143), 0.18);">
-                    <div class="bg-surface-container-low rounded-[22px] p-6 relative overflow-hidden">
+                <div class="relative rounded-3xl overflow-hidden">
+                    <div class="absolute inset-0 rounded-3xl p-[6px] pointer-events-none" style="background: conic-gradient(from 180deg, rgba(255,255,255,0.08) 0deg, rgba(255,255,255,0.08) ${weekProgressPct * 3.6}deg, rgba(59,130,246,1) ${weekProgressPct * 3.6}deg, rgba(59,130,246,1) ${Math.min(weekProgressPct * 3.6 + 1.1, 360)}deg, rgba(255,255,255,0.04) ${Math.min(weekProgressPct * 3.6 + 1.1, 360)}deg, rgba(255,255,255,0.04) 360deg); box-shadow: 0 0 0 1px rgba(59,130,246,0.18), 0 0 18px rgba(59,130,246,0.10);">
+                        <div class="w-full h-full rounded-[22px] bg-surface-container-low"></div>
+                    </div>
+                    <div class="relative z-10 bg-surface-container-low rounded-[22px] p-6 pt-7 overflow-hidden">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-400/10 blur-3xl -mr-16 -mt-16 opacity-20"></div>
                         <div class="flex justify-between items-end mb-6">
                             <div>
