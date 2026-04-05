@@ -1,5 +1,5 @@
 export function getDashboardHTML({ 
-    todayLog, balances, todayPct, missing, isAllDone, weekData, weekProgressPct = 0, DEFAULT_HABITS, snapMessage, libraryItems 
+    todayLog, balances, todayPct, missing, isAllDone, weekData, snapWeeks = [], currentWeekIndex = 0, DEFAULT_HABITS, snapMessage, libraryItems 
 }) {
     const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
@@ -43,12 +43,26 @@ export function getDashboardHTML({
     const emptyCard = (label) => `<div class="min-w-[240px] bg-surface-container rounded-3xl p-5 border border-dashed border-white/10 flex items-center justify-center"><span class="text-sm text-on-surface-variant/30">Nenhum ${label} cadastrado</span></div>`;
 
     // Helper for generating progress rings
-    const generateRing = (dayToken, state, percent, isRestDay = false) => {
+    const generateRing = (dayToken, dayNumber, state, percent, isRestDay = false) => {
+        if (state === 'outside') {
+            return `
+            <div class="flex flex-col items-center gap-1.5 flex-shrink-0 min-w-[40px] opacity-20">
+                <span class="text-[10px] font-bold text-on-surface-variant">${dayToken}</span>
+                <span class="text-[9px] text-on-surface-variant/60">${dayNumber}</span>
+                <div class="relative w-10 h-10 flex items-center justify-center">
+                    <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 40 40">
+                        <circle cx="20" cy="20" r="16" fill="transparent" stroke="currentColor" stroke-width="3" class="text-white/5" />
+                    </svg>
+                </div>
+            </div>`;
+        }
+
         if (state === 'future') {
             // Rule 1: Ghost Rings
             return `
-            <div class="flex flex-col items-center gap-2 flex-shrink-0 min-w-[40px]">
+            <div class="flex flex-col items-center gap-1.5 flex-shrink-0 min-w-[40px]">
                 <span class="text-[10px] font-bold text-on-surface-variant">${dayToken}</span>
+                <span class="text-[9px] text-on-surface-variant/70">${dayNumber}</span>
                 <div class="relative w-10 h-10 flex items-center justify-center">
                     <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 40 40">
                         <circle cx="20" cy="20" r="16" fill="transparent" stroke="currentColor" stroke-width="3" class="text-white/5" />
@@ -90,8 +104,9 @@ export function getDashboardHTML({
             : (isPerfect ? `style="box-shadow: 0 0 15px var(--accent-color);"` : '');
 
         return `
-        <div class="flex flex-col items-center gap-2 flex-shrink-0 min-w-[40px]">
+        <div class="flex flex-col items-center gap-1.5 flex-shrink-0 min-w-[40px]">
             <span class="text-[10px] font-bold ${state === 'today' ? 'text-primary accent-text' : 'text-on-surface-variant'}">${dayToken}</span>
+            <span class="text-[9px] ${state === 'today' ? 'text-primary/90' : 'text-on-surface-variant/75'}">${dayNumber}</span>
             <div class="relative w-10 h-10 flex items-center justify-center rounded-full" ${glowStyle} ${state === 'today' ? 'id="snap-ring-today-container"' : ''}>
                 ${todayPulse}
                 <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 40 40">
@@ -102,16 +117,36 @@ export function getDashboardHTML({
         </div>`;
     };
 
+    const weeks = (snapWeeks && snapWeeks.length > 0)
+        ? snapWeeks
+        : [{ index: 0, label: 'Semana 1', rangeLabel: '', days: weekData || [] }];
+
+    const slideDots = weeks.map((w, idx) => {
+        const active = idx === currentWeekIndex;
+        return `<span data-week-dot="${idx}" class="w-1.5 h-1.5 rounded-full ${active ? 'bg-primary accent-bg' : 'bg-white/20'}"></span>`;
+    }).join('');
+
+    const weekSlides = weeks.map((week, idx) => {
+        const weekPerfect = week.days.filter(d => d.state !== 'outside' && d.pct === 100 && !d.isRestDay).length;
+        return `
+            <div data-week-index="${idx}" class="w-full shrink-0 snap-start">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60">${week.label}${week.rangeLabel ? ` • ${week.rangeLabel}` : ''}</span>
+                    <span class="text-[10px] font-extrabold text-primary accent-text">${weekPerfect} perfeitos</span>
+                </div>
+                <div class="flex flex-wrap justify-between gap-y-6 gap-x-2 w-full pb-2 px-1">
+                    ${week.days.map(d => generateRing(d.day, d.dayNumber, d.state, d.pct, d.isRestDay)).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+
     return `
         <div class="space-y-8 pb-12">
             <!-- Weekly Snap & Finance Block -->
             <section class="space-y-6 pt-8 sm:pt-0 mt-2 sm:mt-0">
                 <!-- Weekly Snap Card -->
-                <div class="relative rounded-3xl overflow-hidden">
-                    <div class="absolute inset-0 rounded-3xl p-[6px] pointer-events-none" style="background: conic-gradient(from 180deg, rgba(255,255,255,0.08) 0deg, rgba(255,255,255,0.08) ${weekProgressPct * 3.6}deg, rgba(59,130,246,1) ${weekProgressPct * 3.6}deg, rgba(59,130,246,1) ${Math.min(weekProgressPct * 3.6 + 1.1, 360)}deg, rgba(255,255,255,0.04) ${Math.min(weekProgressPct * 3.6 + 1.1, 360)}deg, rgba(255,255,255,0.04) 360deg); box-shadow: 0 0 0 1px rgba(59,130,246,0.18), 0 0 18px rgba(59,130,246,0.10);">
-                        <div class="w-full h-full rounded-[22px] bg-surface-container-low"></div>
-                    </div>
-                    <div class="relative z-10 bg-surface-container-low rounded-[22px] p-6 pt-7 overflow-hidden">
+                <div class="bg-surface-container-low rounded-3xl p-6 pt-7 relative overflow-hidden border border-white/6">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-400/10 blur-3xl -mr-16 -mt-16 opacity-20"></div>
                         <div class="flex justify-between items-end mb-6">
                             <div>
@@ -119,17 +154,18 @@ export function getDashboardHTML({
                                 <p class="text-[var(--text-primary)] font-semibold tracking-tight">${snapMessage}</p>
                             </div>
                             <div class="text-right shrink-0">
-                                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 block">Semana</span>
-                                <span class="text-[10px] font-extrabold text-primary accent-text">${weekProgressPct}%</span>
+                                <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 block">Semanas no mês</span>
+                                <span class="text-[10px] font-extrabold text-primary accent-text">${weeks.length}</span>
                             </div>
                         </div>
-                        
-                        <div class="flex justify-between items-center relative mt-4">
-                            <div class="flex flex-wrap justify-between gap-y-6 gap-x-2 w-full pb-2 px-1">
-                                ${weekData.map(d => generateRing(d.day, d.state, d.pct, d.isRestDay)).join('')}
-                            </div>
+
+                        <div class="flex justify-center gap-1 mb-4">
+                            ${slideDots}
                         </div>
-                    </div>
+
+                        <div id="snap-weeks-carousel" class="flex overflow-x-auto hide-scrollbar snap-x snap-mandatory gap-6" style="scrollbar-width:none;">
+                            ${weekSlides}
+                        </div>
                 </div>
 
                 <!-- Finance Card -->
@@ -273,10 +309,10 @@ export function getDashboardHTML({
                     <section class="space-y-4">
                         <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Seu corpo e tempo</h3>
                         <div class="grid grid-cols-2 gap-4">
-                            <!-- Tempo de Tela -->
+                            <!-- Hora que acordou -->
                             <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
-                                <span class="text-xs font-bold text-on-surface-variant px-1">Tempo de Tela</span>
-                                <input id="input-screen-time" type="time" value="${todayLog.screen_time || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">
+                                <span class="text-xs font-bold text-on-surface-variant px-1">Hora que acordou</span>
+                                <input id="input-wake-time" type="time" value="${todayLog.wake_time || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">
                             </div>
                             <!-- Instagram -->
                             <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">

@@ -44,6 +44,15 @@ function formatDateKeyLocal(dateObj = new Date()) {
     return `${y}-${m}-${d}`;
 }
 
+function getMondayOnOrBefore(dateObj) {
+    const d = new Date(dateObj);
+    const dow = d.getDay(); // 0=Sun..6=Sat
+    const offset = dow === 0 ? -6 : -(dow - 1);
+    d.setDate(d.getDate() + offset);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
 export async function renderDashboard() {
     const root = document.getElementById('dashboard-root');
     try {
@@ -65,33 +74,89 @@ export async function renderDashboard() {
         const missing = ALL_HABITS.length - habitsCompleted;
         const isAllDone = isRestDay || habitsCompleted === ALL_HABITS.length;
 
-        // Build weekly snap from real data (last 5 weekdays)
+        // Build weekly snap carousel from all weeks of current month (Mon-Fri)
         const dayNames = ['D','S','T','Q','Q','S','S'];
         const now = new Date();
         const todayStr = formatDateKeyLocal(now);
         const allLogs = await DB.getAllDailyLogs();
         const balances = getDashboardBalances(allLogs, todayStr);
 
-        // Find the current weekday position in Mon-Fri (0-4)
-        const todayDow = now.getDay(); // 0=Sun .. 6=Sat
-        // Build last 5 weekdays ending on today (or nearest weekday)
-        const weekDays = [];
-        const d = new Date(now);
-        // Go back to Monday of this week
-        const mondayOffset = todayDow === 0 ? -6 : -(todayDow - 1);
-        d.setDate(d.getDate() + mondayOffset);
-        for (let i = 0; i < 5; i++) {
-            const ds = formatDateKeyLocal(d);
-            const log = allLogs?.[ds];
-            const pct = calcDayPctFromLog(log);
-            const isRestDayLog = !!(log && log.rest_day);
-            const state = ds === todayStr ? 'today' : (ds < todayStr ? 'past' : 'future');
-            weekDays.push({ day: dayNames[d.getDay()], state, pct, isRestDay: isRestDayLog });
-            d.setDate(d.getDate() + 1);
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+        const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+
+        const snapWeeks = [];
+        let currentWeekIndex = 0;
+        let foundCurrentWeek = false;
+        let weekIndex = 0;
+        let weekStart = getMondayOnOrBefore(firstDayOfMonth);
+
+        while (weekStart <= lastDayOfMonth) {
+            const days = [];
+            let hasMonthDay = false;
+
+            for (let i = 0; i < 5; i++) {
+                const dayDate = new Date(weekStart);
+                dayDate.setDate(weekStart.getDate() + i);
+
+                const dayMonth = dayDate.getMonth();
+                const inCurrentMonth = dayMonth === currentMonth;
+                const ds = formatDateKeyLocal(dayDate);
+
+                if (inCurrentMonth) hasMonthDay = true;
+
+                const log = inCurrentMonth ? allLogs?.[ds] : null;
+                const pct = inCurrentMonth ? calcDayPctFromLog(log) : 0;
+                const isRestDayLog = !!(log && log.rest_day);
+
+                const state = !inCurrentMonth
+                    ? 'outside'
+                    : ds === todayStr
+                        ? 'today'
+                        : (ds < todayStr ? 'past' : 'future');
+
+                days.push({
+                    day: dayNames[dayDate.getDay()],
+                    dayNumber: dayDate.getDate(),
+                    dateKey: ds,
+                    state,
+                    pct,
+                    isRestDay: isRestDayLog
+                });
+
+                if (ds === todayStr) {
+                    currentWeekIndex = weekIndex;
+                    foundCurrentWeek = true;
+                }
+            }
+
+            if (hasMonthDay) {
+                const firstInMonth = days.find(d => d.state !== 'outside');
+                const reversed = [...days].reverse();
+                const lastInMonth = reversed.find(d => d.state !== 'outside');
+                snapWeeks.push({
+                    index: weekIndex,
+                    label: `Semana ${weekIndex + 1}`,
+                    rangeLabel: firstInMonth && lastInMonth
+                        ? `${String(firstInMonth.dayNumber).padStart(2, '0')} - ${String(lastInMonth.dayNumber).padStart(2, '0')}`
+                        : '',
+                    days
+                });
+                weekIndex++;
+            }
+
+            weekStart.setDate(weekStart.getDate() + 7);
         }
-        const weekData = weekDays;
-        const weekProgressDays = weekData.filter(d => d.pct === 100 || d.isRestDay).length;
-        const weekProgressPct = weekData.length > 0 ? Math.round((weekProgressDays / weekData.length) * 100) : 0;
+
+        if (!foundCurrentWeek && snapWeeks.length > 0) {
+            const fallbackIndex = snapWeeks.findLastIndex(week =>
+                week.days.some(d => d.state !== 'outside' && d.dateKey <= todayStr)
+            );
+            currentWeekIndex = fallbackIndex >= 0 ? fallbackIndex : 0;
+        }
+
+        const weekData = snapWeeks[currentWeekIndex]?.days || [];
 
         // Dynamic snap message
         const perfectDaysCount = weekData.filter(d => d.pct === 100 && !d.isRestDay).length;
@@ -114,8 +179,59 @@ export async function renderDashboard() {
         }
         // Generate the dynamic view UI
         root.innerHTML = getDashboardHTML({ 
-            todayLog, balances, todayPct, missing, isAllDone, weekData, weekProgressPct, DEFAULT_HABITS: ALL_HABITS, snapMessage, libraryItems 
+            todayLog,
+            balances,
+            todayPct,
+            missing,
+            isAllDone,
+            weekData,
+            snapWeeks,
+            currentWeekIndex,
+            DEFAULT_HABITS: ALL_HABITS,
+            snapMessage,
+            libraryItems
         });
+
+        const snapCarousel = document.getElementById('snap-weeks-carousel');
+        const currentSlide = snapCarousel?.querySelector(`[data-week-index="${currentWeekIndex}"]`);
+        if (snapCarousel && currentSlide) {
+            snapCarousel.scrollLeft = currentSlide.offsetLeft;
+
+            const updateSnapWeekDots = () => {
+                const slides = Array.from(snapCarousel.querySelectorAll('[data-week-index]'));
+                const dots = Array.from(document.querySelectorAll('[data-week-dot]'));
+                if (!slides.length || !dots.length) return;
+
+                let activeIdx = 0;
+                let minDist = Number.POSITIVE_INFINITY;
+                for (const slide of slides) {
+                    const idx = Number(slide.getAttribute('data-week-index'));
+                    const dist = Math.abs(slide.offsetLeft - snapCarousel.scrollLeft);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        activeIdx = idx;
+                    }
+                }
+
+                dots.forEach(dot => {
+                    const isActive = Number(dot.getAttribute('data-week-dot')) === activeIdx;
+                    dot.classList.toggle('bg-primary', isActive);
+                    dot.classList.toggle('accent-bg', isActive);
+                    dot.classList.toggle('bg-white/20', !isActive);
+                });
+            };
+
+            let rafId = null;
+            snapCarousel.addEventListener('scroll', () => {
+                if (rafId) return;
+                rafId = requestAnimationFrame(() => {
+                    updateSnapWeekDots();
+                    rafId = null;
+                });
+            }, { passive: true });
+
+            updateSnapWeekDots();
+        }
 
         // Ensure dynamic dom texts are synced
         await recalculateProgress();
@@ -141,7 +257,7 @@ window.openCheckinModal = async () => {
     if (lblDate) lblDate.textContent = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.','').toUpperCase();
     if (lblDay) lblDay.textContent = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
 
-    // Pre-select saved mood/sleep/water/screen_time/instagram
+    // Pre-select saved mood/sleep/water/wake_time/instagram
     const todayLog = await DB.getTodayLog();
 
     // Mood chips
@@ -179,10 +295,10 @@ window.openCheckinModal = async () => {
         }
     }
 
-    // Screen time inputs
-    const screenInput = document.getElementById('input-screen-time');
+    // Time inputs
+    const wakeTimeInput = document.getElementById('input-wake-time');
     const instagramInput = document.getElementById('input-instagram');
-    if (screenInput) screenInput.value = todayLog.screen_time || '';
+    if (wakeTimeInput) wakeTimeInput.value = todayLog.wake_time || '';
     if (instagramInput) instagramInput.value = todayLog.instagram || '';
 
     // Rest day toggle
@@ -196,13 +312,13 @@ window.openCheckinModal = async () => {
 };
 
 window.closeCheckinModal = async () => {
-    // Save screen_time and instagram before closing
-    const screenInput = document.getElementById('input-screen-time');
+    // Save wake_time and instagram before closing
+    const wakeTimeInput = document.getElementById('input-wake-time');
     const instagramInput = document.getElementById('input-instagram');
     const updates = [];
 
-    if (screenInput) {
-        updates.push(DB.updateDailyMetrics('screen_time', screenInput.value || ''));
+    if (wakeTimeInput) {
+        updates.push(DB.updateDailyMetrics('wake_time', wakeTimeInput.value || ''));
     }
     if (instagramInput) {
         updates.push(DB.updateDailyMetrics('instagram', instagramInput.value || ''));
