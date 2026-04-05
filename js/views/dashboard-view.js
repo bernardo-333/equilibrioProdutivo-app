@@ -129,7 +129,7 @@ export function getDashboardHTML({
     const weekSlides = weeks.map((week, idx) => {
         const weekPerfect = week.days.filter(d => d.state !== 'outside' && d.pct === 100 && !d.isRestDay).length;
         return `
-            <div data-week-index="${idx}" class="w-full shrink-0 snap-start">
+            <div data-week-index="${idx}" class="min-w-full shrink-0 snap-start">
                 <div class="flex items-center justify-between mb-4">
                     <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60">${week.label}${week.rangeLabel ? ` • ${week.rangeLabel}` : ''}</span>
                     <span class="text-[10px] font-extrabold text-primary accent-text">${weekPerfect} perfeitos</span>
@@ -148,12 +148,12 @@ export function getDashboardHTML({
                 <!-- Weekly Snap Card -->
                 <div class="bg-surface-container-low rounded-3xl p-6 pt-7 relative overflow-hidden border border-white/6">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-400/10 blur-3xl -mr-16 -mt-16 opacity-20"></div>
-                        <div class="flex justify-between items-end mb-6">
-                            <div>
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 mb-5">
+                            <div class="max-w-full">
                                 <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant mb-1 block font-headline">Snap Semanal</span>
-                                <p class="text-[var(--text-primary)] font-semibold tracking-tight">${snapMessage}</p>
+                                <p class="text-[var(--text-primary)] font-semibold tracking-tight leading-snug pr-1">${snapMessage}</p>
                             </div>
-                            <div class="text-right shrink-0">
+                            <div class="self-end sm:self-auto text-right shrink-0">
                                 <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 block">Semanas no mês</span>
                                 <span class="text-[10px] font-extrabold text-primary accent-text">${weeks.length}</span>
                             </div>
@@ -163,7 +163,7 @@ export function getDashboardHTML({
                             ${slideDots}
                         </div>
 
-                        <div id="snap-weeks-carousel" class="flex overflow-x-auto hide-scrollbar snap-x snap-mandatory gap-6" style="scrollbar-width:none;">
+                        <div id="snap-weeks-carousel" class="flex overflow-x-auto hide-scrollbar snap-x snap-proximity gap-4 sm:gap-6" style="scrollbar-width:none;">
                             ${weekSlides}
                         </div>
                 </div>

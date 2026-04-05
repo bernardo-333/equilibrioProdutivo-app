@@ -83,6 +83,7 @@ export async function renderDashboard() {
 
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
+        const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
         const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
         const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
 
@@ -156,7 +157,15 @@ export async function renderDashboard() {
             currentWeekIndex = fallbackIndex >= 0 ? fallbackIndex : 0;
         }
 
-        const weekData = snapWeeks[currentWeekIndex]?.days || [];
+        // Keep the week selected by the user while staying in the same month.
+        // If the month changed, reset to the dynamically detected current week.
+        let selectedWeekIndex = currentWeekIndex;
+        if (window._snapWeekMonthKey === monthKey && Number.isInteger(window._snapWeekIndex)) {
+            selectedWeekIndex = Math.max(0, Math.min(window._snapWeekIndex, snapWeeks.length - 1));
+        }
+        window._snapWeekMonthKey = monthKey;
+
+        const weekData = snapWeeks[selectedWeekIndex]?.days || [];
 
         // Dynamic snap message
         const perfectDaysCount = weekData.filter(d => d.pct === 100 && !d.isRestDay).length;
@@ -186,16 +195,18 @@ export async function renderDashboard() {
             isAllDone,
             weekData,
             snapWeeks,
-            currentWeekIndex,
+            currentWeekIndex: selectedWeekIndex,
             DEFAULT_HABITS: ALL_HABITS,
             snapMessage,
             libraryItems
         });
 
         const snapCarousel = document.getElementById('snap-weeks-carousel');
-        const currentSlide = snapCarousel?.querySelector(`[data-week-index="${currentWeekIndex}"]`);
+        const currentSlide = snapCarousel?.querySelector(`[data-week-index="${selectedWeekIndex}"]`);
         if (snapCarousel && currentSlide) {
-            snapCarousel.scrollLeft = currentSlide.offsetLeft;
+            requestAnimationFrame(() => {
+                snapCarousel.scrollTo({ left: currentSlide.offsetLeft, behavior: 'auto' });
+            });
 
             const updateSnapWeekDots = () => {
                 const slides = Array.from(snapCarousel.querySelectorAll('[data-week-index]'));
@@ -212,6 +223,8 @@ export async function renderDashboard() {
                         activeIdx = idx;
                     }
                 }
+
+                window._snapWeekIndex = activeIdx;
 
                 dots.forEach(dot => {
                     const isActive = Number(dot.getAttribute('data-week-dot')) === activeIdx;
