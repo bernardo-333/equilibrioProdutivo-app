@@ -11,6 +11,7 @@ const HABITS = [
     { id: 'fill_notion', name: 'Preencher Notion' }
 ];
 const TOTAL_CHECKINS = HABITS.length;
+const MONTH_NAMES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 function calcDayPct(log) {
     if (!log) return 0;
@@ -40,6 +41,7 @@ export async function renderPlanner() {
     const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const todayDate = now.getDate();
+    const firstDayOffset = new Date(year, month, 1).getDay();
 
     const monthLogs = await DB.getMonthlyLogs(yearMonth);
 
@@ -61,6 +63,18 @@ export async function renderPlanner() {
 
     // History days (most recent first, only days with data)
     const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const habitFilterDays = [];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
+        const log = monthLogs[ds];
+        habitFilterDays.push({
+            day: d,
+            rawDate: ds,
+            hasLog: !!log,
+            habits: (log && log.habits) ? log.habits : {}
+        });
+    }
     const historyDays = [];
     for (let d = todayDate; d >= 1; d--) {
         const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
@@ -75,6 +89,8 @@ export async function renderPlanner() {
             mood: log.mood || null,
             sleep: log.sleep || null,
             water: log.water || 0,
+            wake_time: log.wake_time || '',
+            instagram: log.instagram || '',
             telas: log.screen_time || 0,
             income_dia: log.income_dia || 0,
             expense_dia: log.expense_dia || 0,
@@ -86,6 +102,15 @@ export async function renderPlanner() {
     }
 
     window._plannerHistory = historyDays;
+    window._plannerHabitFilter = {
+        days: habitFilterDays,
+        monthLabel: `${MONTH_NAMES_FULL[month]} ${year}`,
+        firstDayOffset,
+        todayDate
+    };
+    if (!window._plannerHabitFilterCurrentHabit) {
+        window._plannerHabitFilterCurrentHabit = 'gym';
+    }
 
     // Calculate real metrics
     const logsArr = Object.values(monthLogs);
@@ -118,13 +143,107 @@ export async function renderPlanner() {
         totalGastoDinheiro: monthlyTotals.totalGastoDinheiro
     };
 
-    root.innerHTML = getPlannerHTML({ calendarData, historyDays, metrics, kanbanData });
+    root.innerHTML = getPlannerHTML({
+        calendarData,
+        historyDays,
+        metrics,
+        kanbanData,
+        habitCatalog: HABITS,
+        habitFilterMonthLabel: `${MONTH_NAMES_FULL[month]} ${year}`
+    });
     initKanbanDragAndDrop();
     } catch (e) {
         console.error('Planner error:', e);
         root.innerHTML = `<div style="color:red; padding:20px; word-break:break-all;"><h3>Erro no Planner:</h3><pre>${e.message}\n${e.stack}</pre></div>`;
     }
 }
+
+function renderHabitFilterCalendar() {
+    const state = window._plannerHabitFilter;
+    if (!state) return;
+
+    const habitId = window._plannerHabitFilterCurrentHabit || 'gym';
+    const habit = HABITS.find(h => h.id === habitId) || HABITS[0];
+    const grid = document.getElementById('habit-filter-grid');
+    const summary = document.getElementById('habit-filter-summary');
+    const title = document.getElementById('habit-filter-selected-title');
+
+    if (!grid || !summary || !title) return;
+
+    document.querySelectorAll('.habit-filter-chip').forEach(btn => {
+        const active = btn.dataset.habit === habit.id;
+        btn.classList.toggle('border-primary', active);
+        btn.classList.toggle('bg-primary/20', active);
+        btn.classList.toggle('text-primary', active);
+        btn.classList.toggle('border-white/10', !active);
+        btn.classList.toggle('bg-surface-highest', !active);
+        btn.classList.toggle('text-on-surface-variant', !active);
+    });
+
+    const doneDays = state.days.filter(d => d.hasLog && !!d.habits?.[habit.id]).length;
+    const loggedDays = state.days.filter(d => d.hasLog).length;
+
+    title.textContent = habit.name;
+    summary.textContent = `${doneDays} de ${loggedDays} dias com registro concluíram este hábito.`;
+
+    const emptyOffsets = Array.from({ length: state.firstDayOffset }, () => '<div class="aspect-square w-full"></div>').join('');
+    const cells = state.days.map(d => {
+        const hasDone = d.hasLog && !!d.habits?.[habit.id];
+        const isToday = d.day === state.todayDate;
+        const clickable = d.hasLog ? `onclick="window.openDailyDetail('${d.rawDate}')"` : '';
+        const base = hasDone
+            ? 'bg-primary/90 border border-primary/60 text-white shadow-[0_0_10px_var(--accent-color)]'
+            : d.hasLog
+                ? 'bg-surface-highest border border-white/10 text-on-surface-variant'
+                : 'bg-white/[0.04] border border-transparent text-white/20';
+        const ring = isToday ? 'ring-2 ring-primary/70' : '';
+        const hover = d.hasLog ? 'cursor-pointer hover:scale-105 hover:brightness-110' : 'cursor-default';
+        const marker = hasDone ? '<span class="absolute top-1 right-1 material-symbols-outlined text-[10px] text-black/70" style="font-variation-settings: \'FILL\' 1;">check_circle</span>' : '';
+        return `<div ${clickable} class="aspect-square w-full rounded-xl relative flex items-center justify-center text-[10px] font-extrabold transition-all ${base} ${ring} ${hover}">${d.day}${marker}</div>`;
+    }).join('');
+
+    grid.innerHTML = emptyOffsets + cells;
+}
+
+window.openHabitFilterModal = () => {
+    const modal = document.getElementById('habit-filter-modal');
+    const overlay = document.getElementById('habit-filter-overlay');
+    const sheet = document.getElementById('habit-filter-sheet');
+    if (!modal || !overlay || !sheet) return;
+
+    const monthLabelEl = document.getElementById('habit-filter-month-label');
+    if (monthLabelEl && window._plannerHabitFilter?.monthLabel) {
+        monthLabelEl.textContent = window._plannerHabitFilter.monthLabel;
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+        overlay.classList.remove('opacity-0');
+        sheet.classList.remove('translate-y-full');
+    });
+
+    renderHabitFilterCalendar();
+};
+
+window.setHabitCalendarFilter = (habitId) => {
+    window._plannerHabitFilterCurrentHabit = habitId;
+    renderHabitFilterCalendar();
+};
+
+window.closeHabitFilterModal = () => {
+    const modal = document.getElementById('habit-filter-modal');
+    const overlay = document.getElementById('habit-filter-overlay');
+    const sheet = document.getElementById('habit-filter-sheet');
+    if (!modal || !overlay || !sheet) return;
+
+    overlay.classList.add('opacity-0');
+    sheet.classList.add('translate-y-full');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 400);
+};
 
 // ----- DAILY DETAIL LOGIC -----
 
@@ -230,6 +349,20 @@ window.openDailyDetail = (date, isEditMode = false) => {
                 Seu corpo e tempo ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
             </h3>
             <div class="grid grid-cols-2 gap-4">
+                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
+                    <span class="text-xs font-bold text-on-surface-variant px-1">Hora que acordou</span>
+                    ${isEditMode
+                        ? `<input id="input-planner-wake-time" type="time" value="${day.wake_time || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">`
+                        : `<span class="text-2xl font-extrabold text-[var(--text-primary)] pl-1 font-headline">${day.wake_time || '--:--'}</span>`}
+                </div>
+
+                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
+                    <span class="text-xs font-bold text-on-surface-variant px-1">Instagram</span>
+                    ${isEditMode
+                        ? `<input id="input-planner-instagram" type="time" value="${day.instagram || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">`
+                        : `<span class="text-2xl font-extrabold text-[var(--text-primary)] pl-1 font-headline">${day.instagram || '--:--'}</span>`}
+                </div>
+
                 <div class="col-span-2 bg-surface-container rounded-3xl p-5 border border-white/5 flex flex-col items-center gap-4">
                     <span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest text-center">Água Consumida (1 Gota = 1 Litro)</span>
                     <div class="flex items-center gap-3">
@@ -417,6 +550,18 @@ window.setRestDayForDate = async (date, isRestDay) => {
 };
 
 window.saveAndCloseDailyDetail = async (date) => {
+    const updates = [];
+
+    const wakeTimeInput = document.getElementById('input-planner-wake-time');
+    const instagramInput = document.getElementById('input-planner-instagram');
+
+    if (wakeTimeInput) {
+        updates.push(DB.updateDailyMetrics('wake_time', wakeTimeInput.value || '', date));
+    }
+    if (instagramInput) {
+        updates.push(DB.updateDailyMetrics('instagram', instagramInput.value || '', date));
+    }
+
     // Busca os 4 campos se estiverem renderizados no HTML
     const incDiaId = document.getElementById('input-planner-dia-income');
     const expDiaId = document.getElementById('input-planner-dia-expense');
@@ -430,9 +575,10 @@ window.saveAndCloseDailyDetail = async (date) => {
             income_din: incDinId ? (parseFloat(incDinId.value) || 0) : 0,
             expense_din: expDinId ? (parseFloat(expDinId.value) || 0) : 0
         };
-        // Salva
-        await DB.updateDailyFinances(date, payload);
+        updates.push(DB.updateDailyFinances(date, payload));
     }
+
+    await Promise.all(updates);
 
     // Fechar Modal
     window.closeDailyDetail();

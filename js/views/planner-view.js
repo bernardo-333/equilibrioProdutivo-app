@@ -1,4 +1,4 @@
-export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData }) {
+export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData, habitCatalog = [], habitFilterMonthLabel = '' }) {
     // Mood/Sleep visual config (Matches Check-in for UI consistency)
     const moodConfigs = {
         "nervoso": { label: "Nervoso", classes: "border-red-500 bg-red-500/20 text-red-500" },
@@ -75,8 +75,13 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                         <h3 class="text-xl font-extrabold text-[var(--text-primary)] font-headline tracking-tighter leading-none">Consistência</h3>
                         <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60 mt-0.5 block">${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][now.getMonth()]} ${now.getFullYear()}</span>
                     </div>
-                    <div class="w-10 h-10 rounded-2xl bg-primary/10 accent-bg/10 flex items-center justify-center">
-                        <span class="material-symbols-outlined text-primary accent-text text-xl">calendar_month</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="window.openHabitFilterModal()" class="h-8 sm:h-10 px-2.5 sm:px-3 rounded-lg sm:rounded-xl border border-white/10 bg-surface-highest text-[9px] sm:text-[10px] font-extrabold tracking-[0.08em] sm:tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">
+                            Filtrar hábitos
+                        </button>
+                        <div class="w-10 h-10 rounded-2xl bg-primary/10 accent-bg/10 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-primary accent-text text-xl">calendar_month</span>
+                        </div>
                     </div>
                 </div>
 
@@ -382,6 +387,52 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData 
                 <!-- List -->
                 <div class="flex-1 overflow-y-auto px-6 py-4 space-y-1 hide-scrollbar">
                     ${historyDays.map(day => getCompactRow(day)).join('')}
+                </div>
+            </div>
+        </div>
+
+        <!-- Habit Filter Calendar Modal -->
+        <div id="habit-filter-modal" class="fixed inset-0 z-[450] hidden flex-col justify-end">
+            <div id="habit-filter-overlay" class="absolute inset-0 bg-[#000000]/80 backdrop-blur-md transition-opacity opacity-0 duration-400" onclick="window.closeHabitFilterModal()"></div>
+            <div id="habit-filter-sheet" class="relative w-full h-[92vh] bg-surface-container-low rounded-t-[40px] flex flex-col shadow-[0_-20px_40px_rgba(0,0,0,0.55)] transform translate-y-full transition-transform duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)]">
+                <div class="px-8 py-5 border-b border-white/5 flex flex-col gap-4">
+                    <div class="w-12 h-[5px] bg-surface-highest rounded-full mx-auto mb-1"></div>
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-2xl font-extrabold text-[var(--text-primary)] font-headline tracking-tight leading-none">Filtro de Hábitos</h3>
+                            <span id="habit-filter-month-label" class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60 mt-1 block">${habitFilterMonthLabel}</span>
+                        </div>
+                        <button class="w-10 h-10 rounded-full bg-surface-highest flex items-center justify-center text-on-surface-variant hover:text-[var(--text-primary)] transition-colors active:scale-95" onclick="window.closeHabitFilterModal()">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-6 py-6 pb-12 space-y-5 hide-scrollbar">
+                    <div class="space-y-3">
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/70 px-2 block">Escolha o hábito</span>
+                        <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-2 px-2" style="scrollbar-width:none;">
+                            ${habitCatalog.map(h => `<button data-habit="${h.id}" onclick="window.setHabitCalendarFilter('${h.id}')" class="habit-filter-chip flex-shrink-0 px-4 py-2.5 rounded-2xl border border-white/10 bg-surface-highest text-on-surface-variant text-xs font-bold transition-all hover:bg-white/5">${h.name}</button>`).join('')}
+                        </div>
+                    </div>
+
+                    <div class="bg-surface-highest/40 rounded-3xl p-4 border border-white/5">
+                        <span class="text-[10px] uppercase font-bold tracking-widest text-on-surface-variant/50 block">Hábito selecionado</span>
+                        <div class="flex items-center justify-between gap-4 mt-2">
+                            <span id="habit-filter-selected-title" class="text-lg font-extrabold text-[var(--text-primary)]">Academia</span>
+                            <span id="habit-filter-summary" class="text-[11px] font-bold text-primary accent-text text-right">0 de 0 dias</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface-container rounded-3xl p-4 border border-white/5">
+                        <div class="grid grid-cols-7 text-[10px] font-bold text-on-surface-variant/30 text-center uppercase tracking-widest mb-2">
+                            <div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div>
+                        </div>
+                        <div id="habit-filter-grid" class="grid grid-cols-7 gap-[5px]"></div>
+                    </div>
+                    <p class="text-[11px] text-on-surface-variant/60 text-center">
+                        Dica: toque em um dia destacado para abrir o Diário de Bordo desse dia.
+                    </p>
                 </div>
             </div>
         </div>
