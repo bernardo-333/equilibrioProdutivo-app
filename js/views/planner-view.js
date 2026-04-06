@@ -39,12 +39,22 @@ export function getPlannerHTML({
         return `<span class="inline-flex items-center justify-center px-2.5 py-1 rounded-xl border text-[10px] font-bold ${c.classes}">${c.label}</span>`;
     };
 
+    const getWeekdayName = (rawDate) => {
+        if (!rawDate) return '';
+        const dt = new Date(`${rawDate}T00:00:00`);
+        if (Number.isNaN(dt.getTime())) return '';
+        return new Intl.DateTimeFormat('pt-BR', { weekday: 'long' }).format(dt);
+    };
+
     const getDiaryTableRow = (day, withMonthKey = false) => `
         <button class="${withMonthKey ? 'history-day-row' : ''} w-full text-left border-b border-white/5 hover:bg-white/[0.03] active:bg-white/[0.06] transition-colors"
                 ${withMonthKey ? `data-month-key="${day.monthKey || ''}"` : ''}
                 onclick="window.openDailyDetail('${day.rawDate}')">
-            <div class="grid items-center gap-3 px-3 py-3" style="grid-template-columns: 80px 140px 110px 95px 120px 95px 80px;">
-                <div class="text-sm font-extrabold text-[var(--text-primary)] leading-none">${day.date}</div>
+            <div class="grid items-center gap-3 px-3 py-3" style="grid-template-columns: 140px 130px 110px 95px 120px 95px 80px;">
+                <div class="flex items-center gap-2 leading-none">
+                    <span class="text-sm font-extrabold text-[var(--text-primary)]">${day.date}</span>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/65">${getWeekdayName(day.rawDate)}</span>
+                </div>
 
                 <div>
                     <div class="h-2 w-full bg-surface-highest rounded-full overflow-hidden border border-white/5">
@@ -200,7 +210,7 @@ export function getPlannerHTML({
                 <div class="bg-surface-container-low rounded-[32px] p-2 border border-white/5 flex flex-col">
                     <div class="overflow-x-auto rounded-2xl border border-white/5" style="scrollbar-width:none;">
                         <div class="min-w-[760px] bg-surface-container-low/70 backdrop-blur">
-                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 80px 140px 110px 95px 120px 95px 80px;">
+                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 140px 130px 110px 95px 120px 95px 80px;">
                                 <span>Data</span>
                                 <span>Progresso</span>
                                 <span>Humor</span>
@@ -445,7 +455,7 @@ export function getPlannerHTML({
                 <div class="flex-1 overflow-y-auto px-6 py-2 hide-scrollbar">
                     <div class="overflow-x-auto rounded-2xl border border-white/5" style="scrollbar-width:none;">
                         <div class="min-w-[760px] bg-surface-container-low/70 backdrop-blur">
-                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 80px 140px 110px 95px 120px 95px 80px;">
+                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 140px 130px 110px 95px 120px 95px 80px;">
                                 <span>Data</span>
                                 <span>Progresso</span>
                                 <span>Humor</span>

@@ -670,6 +670,58 @@ window.saveLibraryForm = async () => {
     setTimeout(() => renderDashboard(), 400);
 };
 
+window.adjustLibraryProgress = async (itemId, delta = 1) => {
+    const items = window._libraryItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const total = Math.max(0, parseInt(item.total, 10) || 0);
+    const current = Math.max(0, parseInt(item.current, 10) || 0);
+    let nextCurrent = current + Number(delta || 0);
+
+    if (total > 0) {
+        nextCurrent = Math.max(0, Math.min(total, nextCurrent));
+    } else {
+        nextCurrent = Math.max(0, nextCurrent);
+    }
+
+    if (nextCurrent === current) return;
+
+    const updated = { ...item, current: nextCurrent };
+    await DB.saveLibraryItem(updated);
+    await renderDashboard();
+};
+
+window.quickSetLibraryProgress = async (itemId) => {
+    const items = window._libraryItems || [];
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const unitLabel = item.type === 'book' ? 'página atual' : 'aula atual';
+    const current = Math.max(0, parseInt(item.current, 10) || 0);
+    const total = Math.max(0, parseInt(item.total, 10) || 0);
+
+    const input = window.prompt(`Digite a ${unitLabel}:`, String(current));
+    if (input === null) return;
+
+    const parsed = Number.parseInt(String(input).trim(), 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        window.showToast?.('Valor invalido. Use um numero inteiro maior ou igual a 0.', 'error');
+        return;
+    }
+
+    let nextCurrent = parsed;
+    if (total > 0) {
+        nextCurrent = Math.min(total, nextCurrent);
+    }
+
+    if (nextCurrent === current) return;
+
+    const updated = { ...item, current: nextCurrent };
+    await DB.saveLibraryItem(updated);
+    await renderDashboard();
+};
+
 window.deleteLibraryItem = async () => {
     if (window._editingLibId && confirm('Tem certeza que deseja excluir esta obra?')) {
         await DB.deleteLibraryItem(window._editingLibId);

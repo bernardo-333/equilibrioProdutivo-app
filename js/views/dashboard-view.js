@@ -6,33 +6,92 @@ export function getDashboardHTML({
         maximumFractionDigits: 2
     });
 
+    const libThemes = [
+        {
+            card: 'bg-gradient-to-br from-cyan-500/12 via-surface-container-highest to-blue-500/10',
+            border: 'border-cyan-300/25',
+            glow: 'shadow-[0_8px_22px_rgba(34,211,238,0.14)]',
+            bar: 'bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.45)]',
+            pct: 'text-cyan-300',
+            stepper: 'bg-cyan-400/10 border-cyan-300/25 text-cyan-200 hover:bg-cyan-400/20'
+        },
+        {
+            card: 'bg-gradient-to-br from-emerald-500/12 via-surface-container-highest to-lime-500/10',
+            border: 'border-emerald-300/25',
+            glow: 'shadow-[0_8px_22px_rgba(52,211,153,0.14)]',
+            bar: 'bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.45)]',
+            pct: 'text-emerald-300',
+            stepper: 'bg-emerald-400/10 border-emerald-300/25 text-emerald-200 hover:bg-emerald-400/20'
+        },
+        {
+            card: 'bg-gradient-to-br from-amber-500/12 via-surface-container-highest to-orange-500/10',
+            border: 'border-amber-300/25',
+            glow: 'shadow-[0_8px_22px_rgba(251,191,36,0.14)]',
+            bar: 'bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.45)]',
+            pct: 'text-amber-300',
+            stepper: 'bg-amber-400/10 border-amber-300/25 text-amber-200 hover:bg-amber-400/20'
+        },
+        {
+            card: 'bg-gradient-to-br from-fuchsia-500/12 via-surface-container-highest to-pink-500/10',
+            border: 'border-fuchsia-300/25',
+            glow: 'shadow-[0_8px_22px_rgba(217,70,239,0.14)]',
+            bar: 'bg-fuchsia-300 shadow-[0_0_10px_rgba(240,171,252,0.45)]',
+            pct: 'text-fuchsia-300',
+            stepper: 'bg-fuchsia-400/10 border-fuchsia-300/25 text-fuchsia-200 hover:bg-fuchsia-400/20'
+        },
+        {
+            card: 'bg-gradient-to-br from-indigo-500/12 via-surface-container-highest to-violet-500/10',
+            border: 'border-indigo-300/25',
+            glow: 'shadow-[0_8px_22px_rgba(99,102,241,0.14)]',
+            bar: 'bg-indigo-300 shadow-[0_0_10px_rgba(165,180,252,0.45)]',
+            pct: 'text-indigo-300',
+            stepper: 'bg-indigo-400/10 border-indigo-300/25 text-indigo-200 hover:bg-indigo-400/20'
+        }
+    ];
+
+    const pickLibTheme = (item) => {
+        const key = `${item?.id || ''}${item?.title || ''}${item?.type || ''}`;
+        let hash = 0;
+        for (let i = 0; i < key.length; i++) {
+            hash = ((hash << 5) - hash) + key.charCodeAt(i);
+            hash |= 0;
+        }
+        const idx = Math.abs(hash) % libThemes.length;
+        return libThemes[idx];
+    };
+
     // Helper: render a library carousel card
     const renderLibCard = (item) => {
         const pct = item.total > 0 ? Math.round((item.current / item.total) * 100) : 0;
         const isBook = item.type === 'book';
+        const theme = pickLibTheme(item);
         const statusLabels = { to_do: 'Para Iniciar', in_progress: 'Em Andamento', done: 'Concluído' };
         const statusColors = { to_do: 'text-on-surface-variant/60 bg-white/5 border-white/10', in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20', done: 'text-green-400 bg-green-400/10 border-green-400/20' };
-        const barColor = isBook ? 'bg-cyan-400 shadow-[0_0_8px_rgba(136,235,255,0.4)]' : 'bg-primary accent-bg shadow-[0_0_8px_rgba(114,254,143,0.4)] accent-glow';
-        const pctColor = isBook ? 'text-cyan-400' : 'text-primary accent-text';
         const unitLabel = isBook ? 'Pág' : 'Aula';
         const sc = statusColors[item.status] || statusColors.to_do;
         return `
-            <div class="min-w-[240px] bg-surface-container-highest rounded-3xl p-5 border border-white/5 space-y-5 flex flex-col relative cursor-pointer active:scale-95 transition-transform" onclick="window.openLibraryView('${item.id}')">
+            <div class="min-w-[255px] rounded-3xl p-5 border space-y-5 flex flex-col relative cursor-pointer active:scale-95 transition-transform ${theme.card} ${theme.border} ${theme.glow}" onclick="window.openLibraryView('${item.id}')">
                 <div class="flex justify-between items-start">
                     <span class="text-3xl">${item.emoji || (isBook ? '📘' : '🎓')}</span>
                     <span class="text-[8px] font-bold ${sc} px-2 py-1 rounded-lg uppercase tracking-widest border">${statusLabels[item.status] || 'Para Iniciar'}</span>
                 </div>
                 <div>
+                    <span class="inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-white/10 bg-black/20 text-white/80 mb-2">${isBook ? 'Livro' : 'Curso'}</span>
                     <h4 class="font-bold text-[var(--text-primary)] text-base leading-tight">${item.title}</h4>
                     <span class="text-[10px] text-on-surface-variant/50">${item.author || ''}</span>
                 </div>
                 <div class="space-y-3 mt-auto">
-                    <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                        <div class="h-full ${barColor} rounded-full" style="width:${pct}%"></div>
+                    <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden border border-white/10">
+                        <div class="h-full ${theme.bar} rounded-full" style="width:${pct}%"></div>
                     </div>
                     <div class="flex justify-between items-center">
-                        <span class="text-xs font-medium text-on-surface-variant">${unitLabel} ${item.current || 0} / ${item.total || 0}</span>
-                        <span class="text-[10px] font-extrabold ${pctColor}">${pct}%</span>
+                        <button class="text-xs font-semibold text-on-surface-variant hover:text-white transition-colors" onclick="event.stopPropagation(); window.quickSetLibraryProgress('${item.id}')">${unitLabel} ${item.current || 0} / ${item.total || 0}</button>
+                        <span class="text-[10px] font-extrabold ${theme.pct}">${pct}%</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="w-8 h-8 rounded-xl border text-base font-extrabold transition-colors ${theme.stepper}" onclick="event.stopPropagation(); window.adjustLibraryProgress('${item.id}', -1)">-</button>
+                        <button class="w-8 h-8 rounded-xl border text-base font-extrabold transition-colors ${theme.stepper}" onclick="event.stopPropagation(); window.adjustLibraryProgress('${item.id}', 1)">+</button>
+                        <button class="flex-1 h-8 rounded-xl border border-white/10 bg-black/20 text-[10px] font-bold uppercase tracking-widest text-white/80 hover:bg-white/10 transition-colors" onclick="event.stopPropagation(); window.quickSetLibraryProgress('${item.id}')">Atualizar</button>
                     </div>
                 </div>
             </div>`;
@@ -485,15 +544,14 @@ export function getDashboardHTML({
                         : (libraryItems || []).map(item => {
                             const pct = item.total > 0 ? Math.round((item.current / item.total) * 100) : 0;
                             const isBook = item.type === 'book';
+                            const theme = pickLibTheme(item);
                             const statusLabels = { to_do: 'Para Iniciar', in_progress: 'Em Andamento', done: 'Concluído' };
                             const statusColors = { to_do: 'text-on-surface-variant/60 bg-white/5 border-white/10', in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20', done: 'text-green-400 bg-green-400/10 border-green-400/20' };
-                            const barColor = isBook ? 'bg-cyan-400 shadow-[0_0_10px_rgba(136,235,255,0.5)]' : 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]';
-                            const pctColor = isBook ? 'text-cyan-400' : 'text-blue-400';
                             const unitLabel = isBook ? 'Pág' : 'Aula';
                             const typeLabel = isBook ? 'Livro' : 'Curso';
                             const sc = statusColors[item.status] || statusColors.to_do;
                             return `
-                            <div class="w-full bg-surface-container-highest rounded-[28px] p-5 border border-white/5 space-y-5 flex flex-col relative cursor-pointer active:scale-[0.98] transition-transform shadow-lg" data-lib-type="${item.type}" onclick="window.openLibraryView('${item.id}')">
+                            <div class="w-full rounded-[28px] p-5 border space-y-5 flex flex-col relative cursor-pointer active:scale-[0.98] transition-transform ${theme.card} ${theme.border} ${theme.glow}" data-lib-type="${item.type}" onclick="window.openLibraryView('${item.id}')">
                                 <div class="flex justify-between items-start">
                                     <span class="text-3xl filter drop-shadow-md">${item.emoji || (isBook ? '📘' : '🎓')}</span>
                                     <span class="text-[10px] font-bold ${sc} px-3 py-1.5 rounded-xl uppercase tracking-widest border">${statusLabels[item.status] || 'Para Iniciar'}</span>
@@ -504,11 +562,16 @@ export function getDashboardHTML({
                                 </div>
                                 <div class="space-y-3 mt-auto">
                                     <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden border border-white/5">
-                                        <div class="h-full ${barColor} rounded-full" style="width:${pct}%"></div>
+                                        <div class="h-full ${theme.bar} rounded-full" style="width:${pct}%"></div>
                                     </div>
                                     <div class="flex justify-between items-center">
-                                        <span class="text-xs font-bold text-on-surface-variant">${unitLabel} ${item.current || 0} de ${item.total || 0}</span>
-                                        <span class="text-xs font-extrabold ${pctColor}">${pct}%</span>
+                                        <button class="text-xs font-bold text-on-surface-variant hover:text-white transition-colors" onclick="event.stopPropagation(); window.quickSetLibraryProgress('${item.id}')">${unitLabel} ${item.current || 0} de ${item.total || 0}</button>
+                                        <span class="text-xs font-extrabold ${theme.pct}">${pct}%</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button class="w-9 h-9 rounded-xl border text-lg font-extrabold transition-colors ${theme.stepper}" onclick="event.stopPropagation(); window.adjustLibraryProgress('${item.id}', -1)">-</button>
+                                        <button class="w-9 h-9 rounded-xl border text-lg font-extrabold transition-colors ${theme.stepper}" onclick="event.stopPropagation(); window.adjustLibraryProgress('${item.id}', 1)">+</button>
+                                        <button class="flex-1 h-9 rounded-xl border border-white/10 bg-black/20 text-[10px] font-bold uppercase tracking-widest text-white/80 hover:bg-white/10 transition-colors" onclick="event.stopPropagation(); window.quickSetLibraryProgress('${item.id}')">Definir atual</button>
                                     </div>
                                 </div>
                             </div>`;
