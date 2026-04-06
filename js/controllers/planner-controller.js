@@ -12,6 +12,7 @@ const HABITS = [
 ];
 const TOTAL_CHECKINS = HABITS.length;
 const MONTH_NAMES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MONTH_NAMES_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function calcDayPct(log) {
     if (!log) return 0;
@@ -44,6 +45,7 @@ export async function renderPlanner() {
     const firstDayOffset = new Date(year, month, 1).getDay();
 
     const monthLogs = await DB.getMonthlyLogs(yearMonth);
+    const allLogs = await DB.getAllDailyLogs();
 
     // Calendar heatmap data
     const calendarData = [];
@@ -62,7 +64,6 @@ export async function renderPlanner() {
     }
 
     // History days (most recent first, only days with data)
-    const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const habitFilterDays = [];
 
     for (let d = 1; d <= daysInMonth; d++) {
@@ -75,6 +76,52 @@ export async function renderPlanner() {
             habits: (log && log.habits) ? log.habits : {}
         });
     }
+
+    const allHistoryDays = Object.entries(allLogs || {})
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .map(([ds, log]) => {
+            const [y, m, d] = ds.split('-').map(Number);
+            const pct = calcDayPct(log);
+            const habits = HABITS.map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
+            return {
+                date: `${String(d).padStart(2, '0')} ${MONTH_NAMES_SHORT[(m || 1) - 1]}`,
+                rawDate: ds,
+                monthKey: `${y}-${String(m).padStart(2, '0')}`,
+                pct,
+                mood: log.mood || null,
+                sleep: log.sleep || null,
+                water: log.water || 0,
+                wake_time: log.wake_time || '',
+                instagram: log.instagram || '',
+                telas: log.screen_time || 0,
+                income_dia: log.income_dia || 0,
+                expense_dia: log.expense_dia || 0,
+                income_din: log.income_din || 0,
+                expense_din: log.expense_din || 0,
+                restDay: !!log.rest_day,
+                habits
+            };
+        });
+
+    const fullHistoryMonths = [];
+    const monthCount = {};
+    for (const row of allHistoryDays) {
+        monthCount[row.monthKey] = (monthCount[row.monthKey] || 0) + 1;
+    }
+    Object.keys(monthCount)
+        .sort((a, b) => b.localeCompare(a))
+        .forEach(key => {
+            const [y, m] = key.split('-').map(Number);
+            fullHistoryMonths.push({
+                key,
+                label: `${MONTH_NAMES_FULL[(m || 1) - 1]} ${y}`,
+                count: monthCount[key]
+            });
+        });
+
+    const fullHistoryCurrentMonthKey = yearMonth;
+    window._plannerFullHistoryCurrentMonthKey = fullHistoryCurrentMonthKey;
+
     const historyDays = [];
     for (let d = todayDate; d >= 1; d--) {
         const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
@@ -83,7 +130,7 @@ export async function renderPlanner() {
         const pct = calcDayPct(log);
         const habits = HABITS.map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
         historyDays.push({
-            date: `${String(d).padStart(2,'0')} ${monthNames[month]}`,
+            date: `${String(d).padStart(2,'0')} ${MONTH_NAMES_SHORT[month]}`,
             rawDate: ds,
             pct,
             mood: log.mood || null,
@@ -101,7 +148,7 @@ export async function renderPlanner() {
         });
     }
 
-    window._plannerHistory = historyDays;
+    window._plannerHistory = allHistoryDays;
     window._plannerHabitFilter = {
         days: habitFilterDays,
         monthLabel: `${MONTH_NAMES_FULL[month]} ${year}`,
@@ -149,7 +196,10 @@ export async function renderPlanner() {
         metrics,
         kanbanData,
         habitCatalog: HABITS,
-        habitFilterMonthLabel: `${MONTH_NAMES_FULL[month]} ${year}`
+        habitFilterMonthLabel: `${MONTH_NAMES_FULL[month]} ${year}`,
+        fullHistoryRows: allHistoryDays,
+        fullHistoryMonths,
+        fullHistoryCurrentMonthKey
     });
     initKanbanDragAndDrop();
     } catch (e) {
@@ -603,6 +653,27 @@ window.closeDailyDetail = () => {
 
 // ----- FULL HISTORY LOGIC -----
 
+window.filterFullHistoryMonth = (monthKey) => {
+    document.querySelectorAll('.history-month-btn').forEach(btn => {
+        const active = btn.dataset.monthKey === monthKey;
+        btn.classList.toggle('bg-primary/20', active);
+        btn.classList.toggle('text-primary', active);
+        btn.classList.toggle('border-primary/30', active);
+        btn.classList.toggle('bg-white/5', !active);
+        btn.classList.toggle('text-on-surface-variant', !active);
+    });
+
+    let visibleCount = 0;
+    document.querySelectorAll('.history-day-row').forEach(row => {
+        const show = row.dataset.monthKey === monthKey;
+        row.classList.toggle('hidden', !show);
+        if (show) visibleCount++;
+    });
+
+    const empty = document.getElementById('full-history-empty');
+    if (empty) empty.classList.toggle('hidden', visibleCount > 0);
+};
+
 window.openFullHistory = () => {
     const modal = document.getElementById('full-history-modal');
     const sheet = document.getElementById('full-history-sheet');
@@ -612,6 +683,12 @@ window.openFullHistory = () => {
     requestAnimationFrame(() => {
         sheet.classList.remove('scale-95', 'opacity-0');
     });
+
+    const defaultMonth = window._plannerFullHistoryCurrentMonthKey
+        || document.querySelector('.history-month-btn')?.getAttribute('data-month-key');
+    if (defaultMonth) {
+        window.filterFullHistoryMonth(defaultMonth);
+    }
 };
 
 window.closeFullHistory = () => {

@@ -1,4 +1,14 @@
-export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData, habitCatalog = [], habitFilterMonthLabel = '' }) {
+export function getPlannerHTML({
+    calendarData,
+    historyDays,
+    metrics,
+    kanbanData,
+    habitCatalog = [],
+    habitFilterMonthLabel = '',
+    fullHistoryRows = [],
+    fullHistoryMonths = [],
+    fullHistoryCurrentMonthKey = ''
+}) {
     // Mood/Sleep visual config (Matches Check-in for UI consistency)
     const moodConfigs = {
         "nervoso": { label: "Nervoso", classes: "border-red-500 bg-red-500/20 text-red-500" },
@@ -17,18 +27,46 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData,
         "ruim": { label: "Ruim", classes: "border-red-500 bg-red-500/20 text-red-500" }
     };
 
-    const getCompactRow = (day) => `
-        <div class="flex items-center justify-between py-4 px-2 border-b border-white/5 hover:bg-white/[0.02] active:bg-white/[0.05] transition-all cursor-pointer group" onclick="window.openDailyDetail('${day.date}')">
-            <span class="text-sm font-bold text-[var(--text-primary)] tracking-tight w-20 capitalize whitespace-nowrap">${day.date}</span>
-            <div class="flex-1 max-w-[120px] h-2 bg-surface-highest rounded-full overflow-hidden border border-white/5 mx-4">
-                <div class="h-full ${day.restDay ? 'bg-amber-300' : 'bg-primary accent-bg'} transition-all duration-1000" style="width: ${day.pct}%"></div>
+    const getMoodChip = (moodKey) => {
+        if (!moodKey || !moodConfigs[moodKey]) return `<span class="text-xs font-bold text-on-surface-variant/60">—</span>`;
+        const c = moodConfigs[moodKey];
+        return `<span class="inline-flex items-center justify-center px-2.5 py-1 rounded-xl border text-[10px] font-bold ${c.classes}">${c.label}</span>`;
+    };
+
+    const getSleepChip = (sleepKey) => {
+        if (!sleepKey || !sleepConfigs[sleepKey]) return `<span class="text-xs font-bold text-on-surface-variant/60">—</span>`;
+        const c = sleepConfigs[sleepKey];
+        return `<span class="inline-flex items-center justify-center px-2.5 py-1 rounded-xl border text-[10px] font-bold ${c.classes}">${c.label}</span>`;
+    };
+
+    const getDiaryTableRow = (day, withMonthKey = false) => `
+        <button class="${withMonthKey ? 'history-day-row' : ''} w-full text-left border-b border-white/5 hover:bg-white/[0.03] active:bg-white/[0.06] transition-colors"
+                ${withMonthKey ? `data-month-key="${day.monthKey || ''}"` : ''}
+                onclick="window.openDailyDetail('${day.rawDate}')">
+            <div class="grid items-center gap-3 px-3 py-3" style="grid-template-columns: 80px 140px 110px 95px 120px 95px 80px;">
+                <div class="text-sm font-extrabold text-[var(--text-primary)] leading-none">${day.date}</div>
+
+                <div>
+                    <div class="h-2 w-full bg-surface-highest rounded-full overflow-hidden border border-white/5">
+                        <div class="h-full ${day.restDay ? 'bg-amber-300' : 'bg-primary accent-bg'}" style="width: ${day.pct}%"></div>
+                    </div>
+                    <div class="text-[10px] font-extrabold ${day.restDay ? 'text-amber-300' : 'text-primary accent-text'} mt-1">${day.restDay ? 'Descanso' : `${day.pct}%`}</div>
+                </div>
+
+                <div>${getMoodChip(day.mood)}</div>
+
+                <div class="text-xs font-bold text-[var(--text-primary)]">${day.wake_time || '--:--'}</div>
+
+                <div>${getSleepChip(day.sleep)}</div>
+
+                <div class="text-xs font-bold text-[var(--text-primary)]">${day.instagram || '--:--'}</div>
+
+                <div class="text-xs font-bold text-cyan-300">${Number(day.water || 0)}L</div>
             </div>
-            <div class="flex items-center gap-3">
-                <span class="text-[10px] font-extrabold ${day.restDay ? 'text-amber-300' : 'text-on-surface-variant/40'} tracking-widest uppercase">${day.restDay ? 'Descanso' : `${day.pct}%`}</span>
-                <span class="material-symbols-outlined text-on-surface-variant/20 group-hover:text-primary transition-colors text-lg">chevron_right</span>
-            </div>
-        </div>
+        </button>
     `;
+
+    const getHistoryTableRow = (day) => getDiaryTableRow(day, true);
 
     // Calendar: calculate start-of-month weekday offset for correct alignment
     const now = new Date();
@@ -60,7 +98,7 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData,
         return `<div title="Dia ${d.day}" ${clickHandler} class="aspect-square w-full rounded-lg ${levelClasses} ${todayRing} relative flex items-center justify-center text-[9px] font-extrabold ${textColor} select-none transition-all duration-200 ${interactions}">${d.day}${perfectMarker}</div>`;
     }).join('');
 
-    const initialRows = historyDays.slice(0, 6).map(day => getCompactRow(day)).join('');
+    const initialRows = historyDays.slice(0, 6).map(day => getDiaryTableRow(day, false)).join('');
 
     return `
         <div class="space-y-6 pb-12 font-headline animate-[fade-in_0.4s_ease-out]">
@@ -160,7 +198,20 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData,
                 </div>
                 
                 <div class="bg-surface-container-low rounded-[32px] p-2 border border-white/5 flex flex-col">
-                    ${initialRows}
+                    <div class="overflow-x-auto rounded-2xl border border-white/5" style="scrollbar-width:none;">
+                        <div class="min-w-[760px] bg-surface-container-low/70 backdrop-blur">
+                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 80px 140px 110px 95px 120px 95px 80px;">
+                                <span>Data</span>
+                                <span>Progresso</span>
+                                <span>Humor</span>
+                                <span>Acordou</span>
+                                <span>Sono</span>
+                                <span>Instagram</span>
+                                <span>Água</span>
+                            </div>
+                            ${initialRows}
+                        </div>
+                    </div>
                     <button class="w-full py-4 text-[10px] font-extrabold uppercase tracking-[0.2em] text-on-surface-variant/60 hover:text-primary transition-colors flex items-center justify-center gap-2" onclick="window.openFullHistory()">
                         Ver Tudo <span class="material-symbols-outlined text-sm">expand_more</span>
                     </button>
@@ -380,13 +431,37 @@ export function getPlannerHTML({ calendarData, historyDays, metrics, kanbanData,
                 </div>
                 <!-- Filter bar -->
                 <div class="px-8 py-4 flex gap-3 overflow-x-auto hide-scrollbar">
-                    <button class="px-5 py-2 rounded-2xl bg-primary/20 text-primary border border-primary/30 font-bold text-xs">Abril</button>
-                    <button class="px-5 py-2 rounded-2xl bg-white/5 text-on-surface-variant font-bold text-xs hover:bg-white/10">Março</button>
-                    <button class="px-5 py-2 rounded-2xl bg-white/5 text-on-surface-variant font-bold text-xs hover:bg-white/10">Fevereiro</button>
+                    ${(fullHistoryMonths || []).map(m => {
+                        const active = m.key === fullHistoryCurrentMonthKey;
+                        return `<button
+                            class="history-month-btn px-5 py-2 rounded-2xl border font-bold text-xs transition-colors ${active ? 'bg-primary/20 text-primary border-primary/30' : 'bg-white/5 text-on-surface-variant border-transparent hover:bg-white/10'}"
+                            data-month-key="${m.key}"
+                            onclick="window.filterFullHistoryMonth('${m.key}')">
+                            ${m.label} <span class="opacity-70">(${m.count})</span>
+                        </button>`;
+                    }).join('')}
                 </div>
                 <!-- List -->
-                <div class="flex-1 overflow-y-auto px-6 py-4 space-y-1 hide-scrollbar">
-                    ${historyDays.map(day => getCompactRow(day)).join('')}
+                <div class="flex-1 overflow-y-auto px-6 py-2 hide-scrollbar">
+                    <div class="overflow-x-auto rounded-2xl border border-white/5" style="scrollbar-width:none;">
+                        <div class="min-w-[760px] bg-surface-container-low/70 backdrop-blur">
+                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 80px 140px 110px 95px 120px 95px 80px;">
+                                <span>Data</span>
+                                <span>Progresso</span>
+                                <span>Humor</span>
+                                <span>Acordou</span>
+                                <span>Sono</span>
+                                <span>Instagram</span>
+                                <span>Água</span>
+                            </div>
+                            <div id="full-history-list">
+                                ${(fullHistoryRows || []).map(day => getHistoryTableRow(day)).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div id="full-history-empty" class="hidden text-center py-10 text-on-surface-variant/40 text-sm font-bold">
+                        Nenhum dia encontrado para este mês.
+                    </div>
                 </div>
             </div>
         </div>
