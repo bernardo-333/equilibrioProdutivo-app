@@ -53,6 +53,33 @@ function getMondayOnOrBefore(dateObj) {
     return d;
 }
 
+function normalizeDurationValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const cleaned = raw.replace(/[^0-9:]/g, '');
+    if (!cleaned) return '';
+
+    if (cleaned.includes(':')) {
+        const [hoursPart = '', minutesPart = ''] = cleaned.split(':');
+        const hours = Math.max(0, Number.parseInt(hoursPart || '0', 10) || 0);
+        const minutes = Math.max(0, Math.min(59, Number.parseInt(minutesPart || '0', 10) || 0));
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+
+    const digits = cleaned.replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length <= 2) {
+        return `00:${digits.padStart(2, '0')}`;
+    }
+
+    const hours = digits.slice(0, -2);
+    const minutes = digits.slice(-2);
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+}
+
+window.normalizeDurationValue = normalizeDurationValue;
+
 export async function renderDashboard() {
     const root = document.getElementById('dashboard-root');
     try {
@@ -312,7 +339,7 @@ window.openCheckinModal = async () => {
     const wakeTimeInput = document.getElementById('input-wake-time');
     const instagramInput = document.getElementById('input-instagram');
     if (wakeTimeInput) wakeTimeInput.value = todayLog.wake_time || '';
-    if (instagramInput) instagramInput.value = todayLog.instagram || '';
+    if (instagramInput) instagramInput.value = normalizeDurationValue(todayLog.instagram || '');
 
     // Rest day toggle
     window.toggleRestDay(!!todayLog.rest_day, true);
@@ -334,7 +361,7 @@ window.closeCheckinModal = async () => {
         updates.push(DB.updateDailyMetrics('wake_time', wakeTimeInput.value || ''));
     }
     if (instagramInput) {
-        updates.push(DB.updateDailyMetrics('instagram', instagramInput.value || ''));
+        updates.push(DB.updateDailyMetrics('instagram', normalizeDurationValue(instagramInput.value || '')));
     }
 
     const restBtn = document.getElementById('rest-day-toggle-checkin');

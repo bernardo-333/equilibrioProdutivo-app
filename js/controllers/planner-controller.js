@@ -14,6 +14,31 @@ const TOTAL_CHECKINS = HABITS.length;
 const MONTH_NAMES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MONTH_NAMES_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+function normalizeDurationValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const cleaned = raw.replace(/[^0-9:]/g, '');
+    if (!cleaned) return '';
+
+    if (cleaned.includes(':')) {
+        const [hoursPart = '', minutesPart = ''] = cleaned.split(':');
+        const hours = Math.max(0, Number.parseInt(hoursPart || '0', 10) || 0);
+        const minutes = Math.max(0, Math.min(59, Number.parseInt(minutesPart || '0', 10) || 0));
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+
+    const digits = cleaned.replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length <= 2) {
+        return `00:${digits.padStart(2, '0')}`;
+    }
+
+    const hours = digits.slice(0, -2);
+    const minutes = digits.slice(-2);
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+}
+
 function calcDayPct(log) {
     if (!log) return 0;
     if (log.rest_day) return 100;
@@ -407,9 +432,9 @@ window.openDailyDetail = (date, isEditMode = false) => {
                 </div>
 
                 <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
-                    <span class="text-xs font-bold text-on-surface-variant px-1">Instagram</span>
+                    <span class="text-xs font-bold text-on-surface-variant px-1">Tempo no Instagram</span>
                     ${isEditMode
-                        ? `<input id="input-planner-instagram" type="time" value="${day.instagram || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">`
+                        ? `<input id="input-planner-instagram" type="text" inputmode="numeric" value="${day.instagram || ''}" placeholder="00:40" maxlength="5" onblur="this.value = window.normalizeDurationValue ? window.normalizeDurationValue(this.value) : this.value" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline tracking-wider" autocomplete="off"><span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 px-1">Formato hh:mm</span>`
                         : `<span class="text-2xl font-extrabold text-[var(--text-primary)] pl-1 font-headline">${day.instagram || '--:--'}</span>`}
                 </div>
 
@@ -609,7 +634,7 @@ window.saveAndCloseDailyDetail = async (date) => {
         updates.push(DB.updateDailyMetrics('wake_time', wakeTimeInput.value || '', date));
     }
     if (instagramInput) {
-        updates.push(DB.updateDailyMetrics('instagram', instagramInput.value || '', date));
+        updates.push(DB.updateDailyMetrics('instagram', normalizeDurationValue(instagramInput.value || ''), date));
     }
 
     // Busca os 4 campos se estiverem renderizados no HTML
