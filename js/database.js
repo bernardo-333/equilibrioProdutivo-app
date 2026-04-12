@@ -147,6 +147,14 @@ export const DB = {
     };
   },
 
+  getEmergencyFund: async () => {
+    const snap = await DB.getRef('finances/emergency_fund').once('value');
+    return snap.exists() ? Number(snap.val()) : 0;
+  },
+  saveEmergencyFund: async (value) => {
+    await DB.getRef('finances/emergency_fund').set(Number(value));
+  },
+
   addTransaction: async (transaction) => {
     transaction.id = Date.now().toString();
     const finances = await DB.getFinances();
