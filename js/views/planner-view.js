@@ -87,7 +87,7 @@ export function getPlannerHTML({
 
     const calendarGridHTML = emptyOffsets + calendarData.map(d => {
         const isToday = d.day === now.getDate();
-        const canOpen = !!d.hasLog;
+        const canOpen = !d.isFuture;
         const isPerfectDay = d.level === 3 && d.pct === 100;
         let levelClasses = '';
         switch(d.level) {

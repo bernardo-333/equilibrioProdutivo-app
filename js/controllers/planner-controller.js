@@ -151,24 +151,23 @@ export async function renderPlanner() {
     for (let d = todayDate; d >= 1; d--) {
         const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
         const log = monthLogs[ds];
-        if (!log) continue;
-        const pct = calcDayPct(log);
-        const habits = HABITS.map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
+        const pct = log ? calcDayPct(log) : 0;
+        const habits = HABITS.map(h => ({ id: h.id, name: h.name, done: !!(log?.habits?.[h.id]) }));
         historyDays.push({
             date: `${String(d).padStart(2,'0')} ${MONTH_NAMES_SHORT[month]}`,
             rawDate: ds,
             pct,
-            mood: log.mood || null,
-            sleep: log.sleep || null,
-            water: log.water || 0,
-            wake_time: log.wake_time || '',
-            instagram: log.instagram || '',
-            telas: log.screen_time || 0,
-            income_dia: log.income_dia || 0,
-            expense_dia: log.expense_dia || 0,
-            income_din: log.income_din || 0,
-            expense_din: log.expense_din || 0,
-            restDay: !!log.rest_day,
+            mood: log?.mood || null,
+            sleep: log?.sleep || null,
+            water: log?.water || 0,
+            wake_time: log?.wake_time || '',
+            instagram: log?.instagram || '',
+            telas: log?.screen_time || 0,
+            income_dia: log?.income_dia || 0,
+            expense_dia: log?.expense_dia || 0,
+            income_din: log?.income_din || 0,
+            expense_din: log?.expense_din || 0,
+            restDay: !!(log?.rest_day),
             habits
         });
     }
@@ -325,7 +324,29 @@ window.closeHabitFilterModal = () => {
 window.openDailyDetail = (date, isEditMode = false) => {
     // Busca novamente do history (que pode ou não estar atualizado dependendo se ele acabou de editar)
     let day = window._plannerHistory.find(d => d.date === date || d.rawDate === date);
-    if (!day) return;
+    if (!day) {
+        const parts = date.split('-').map(Number);
+        if (parts.length !== 3) return;
+        const [y, m, d] = parts;
+        day = {
+            date: `${String(d).padStart(2,'0')} ${MONTH_NAMES_SHORT[(m||1)-1]}`,
+            rawDate: date,
+            pct: 0,
+            mood: null,
+            sleep: null,
+            water: 0,
+            wake_time: '',
+            instagram: '',
+            telas: 0,
+            income_dia: 0,
+            expense_dia: 0,
+            income_din: 0,
+            expense_din: 0,
+            restDay: false,
+            habits: HABITS.map(h => ({ id: h.id, name: h.name, done: false }))
+        };
+        isEditMode = true;
+    }
     
     // Fallback pra date caso seja chamado com rawDate
     const displayDate = day.date || date;
