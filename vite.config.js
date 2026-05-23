@@ -17,7 +17,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: false,
       workbox: {
-        globPatterns: ['**/*.{js,css,html,webp,png,svg,ico}'],
+        globPatterns: ['**/*.{js,css,html,webp,png,svg,ico,json}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
