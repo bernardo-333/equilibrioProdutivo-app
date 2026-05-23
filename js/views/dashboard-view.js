@@ -69,11 +69,15 @@ export function getDashboardHTML({
         const statusColors = { to_do: 'text-on-surface-variant/60 bg-white/5 border-white/10', in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20', done: 'text-green-400 bg-green-400/10 border-green-400/20' };
         const unitLabel = isBook ? 'Pág' : 'Aula';
         const sc = statusColors[item.status] || statusColors.to_do;
+        const isInProgress = item.status === 'in_progress';
+        const isDone = item.status === 'done';
+        const cardOpacity = isDone ? 'opacity-60' : '';
+        const inProgressRing = isInProgress ? 'ring-2 ring-blue-400/40' : '';
         return `
-            <div class="min-w-[255px] rounded-3xl p-5 border space-y-5 flex flex-col relative cursor-pointer active:scale-95 transition-transform ${theme.card} ${theme.border} ${theme.glow}" onclick="window.openLibraryView('${item.id}')">
+            <div class="min-w-[255px] rounded-3xl p-5 border space-y-5 flex flex-col relative cursor-pointer active:scale-95 transition-transform ${theme.card} ${theme.border} ${theme.glow} ${inProgressRing} ${cardOpacity}" onclick="window.openLibraryView('${item.id}')">
                 <div class="flex justify-between items-start">
                     <span class="text-3xl">${item.emoji || (isBook ? '📘' : '🎓')}</span>
-                    <span class="text-[8px] font-bold ${sc} px-2 py-1 rounded-lg uppercase tracking-widest border">${statusLabels[item.status] || 'Para Iniciar'}</span>
+                    <span class="text-[8px] font-bold ${sc} px-2 py-1 rounded-lg uppercase tracking-widest border${isInProgress ? ' animate-pulse' : ''}">${statusLabels[item.status] || 'Para Iniciar'}</span>
                 </div>
                 <div>
                     <span class="inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-white/10 bg-black/20 text-white/80 mb-2">${isBook ? 'Livro' : 'Curso'}</span>
@@ -97,8 +101,10 @@ export function getDashboardHTML({
             </div>`;
     };
 
-    const courses = (libraryItems || []).filter(i => i.type === 'course');
-    const books = (libraryItems || []).filter(i => i.type === 'book');
+    const statusOrder = { in_progress: 0, to_do: 1, done: 2 };
+    const sortByStatus = (arr) => [...arr].sort((a, b) => (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1));
+    const courses = sortByStatus((libraryItems || []).filter(i => i.type === 'course'));
+    const books = sortByStatus((libraryItems || []).filter(i => i.type === 'book'));
     const emptyCard = (label) => `<div class="min-w-[240px] bg-surface-container rounded-3xl p-5 border border-dashed border-white/10 flex items-center justify-center"><span class="text-sm text-on-surface-variant/30">Nenhum ${label} cadastrado</span></div>`;
 
     // Helper for generating progress rings
@@ -369,15 +375,9 @@ export function getDashboardHTML({
                         <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70 pl-2">Seu corpo e tempo</h3>
                         <div class="grid grid-cols-2 gap-4">
                             <!-- Hora que acordou -->
-                            <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
+                            <div class="col-span-2 bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
                                 <span class="text-xs font-bold text-on-surface-variant px-1">Hora que acordou</span>
                                 <input id="input-wake-time" type="time" value="${todayLog.wake_time || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">
-                            </div>
-                            <!-- Instagram -->
-                            <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 relative overflow-hidden group focus-within:ring-2 focus-within:ring-primary/50">
-                                <span class="text-xs font-bold text-on-surface-variant px-1">Tempo no Instagram</span>
-                                <input id="input-instagram" type="text" inputmode="numeric" value="${todayLog.instagram || ''}" placeholder="00:40" maxlength="5" onblur="this.value = window.normalizeDurationValue ? window.normalizeDurationValue(this.value) : this.value" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline tracking-wider" autocomplete="off">
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 px-1">Formato hh:mm</span>
                             </div>
                             <!-- Água -->
                             <div class="col-span-2 bg-surface-container rounded-3xl p-5 border border-white/5 space-y-4 flex flex-col items-center justify-center">
@@ -401,8 +401,8 @@ export function getDashboardHTML({
                             <span id="rest-day-badge-checkin" class="hidden flex-shrink-0 px-3 py-2 rounded-xl bg-amber-400/20 border border-amber-300/30 text-amber-200 text-[10px] font-extrabold uppercase tracking-widest">Descanso</span>
                         </div>
                         <div class="flex justify-between items-center pl-2 pr-1">
-                            <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70">As 8 Rotinas</h3>
-                            <span class="text-[10px] font-bold text-primary accent-text" id="lbl-habit-counter">0/8</span>
+                            <h3 class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/70">As ${DEFAULT_HABITS.length} Rotinas</h3>
+                            <span class="text-[10px] font-bold text-primary accent-text" id="lbl-habit-counter">0/${DEFAULT_HABITS.length}</span>
                         </div>
                         <div id="checkin-habits-section" class="bg-surface-container rounded-[32px] p-2 space-y-1 border border-white/5 transition-opacity">
                             ${DEFAULT_HABITS.map((h, i) => {
@@ -540,9 +540,11 @@ export function getDashboardHTML({
 
                 <!-- Scrollable List Area -->
                 <div class="flex-1 overflow-y-auto px-6 py-6 pb-32 space-y-4 hide-scrollbar" id="library-modal-list">
-                    ${(libraryItems || []).length === 0 
-                        ? '<p class="text-center text-on-surface-variant/30 text-sm py-12">Nenhuma obra cadastrada ainda.</p>'
-                        : (libraryItems || []).map(item => {
+                    ${(() => {
+                        const allItems = libraryItems || [];
+                        if (allItems.length === 0) return '<p class="text-center text-on-surface-variant/30 text-sm py-12">Nenhuma obra cadastrada ainda.</p>';
+
+                        const renderLibItem = (item, isDoneSection = false) => {
                             const pct = item.total > 0 ? Math.round((item.current / item.total) * 100) : 0;
                             const isBook = item.type === 'book';
                             const theme = pickLibTheme(item);
@@ -551,8 +553,11 @@ export function getDashboardHTML({
                             const unitLabel = isBook ? 'Pág' : 'Aula';
                             const typeLabel = isBook ? 'Livro' : 'Curso';
                             const sc = statusColors[item.status] || statusColors.to_do;
+                            const isInProgress = item.status === 'in_progress';
+                            const inProgressRing = isInProgress ? 'ring-2 ring-blue-400/30' : '';
+                            const doneOpacity = isDoneSection ? 'opacity-60' : '';
                             return `
-                            <div class="w-full rounded-[28px] p-5 border space-y-5 flex flex-col relative cursor-pointer active:scale-[0.98] transition-transform ${theme.card} ${theme.border} ${theme.glow}" data-lib-type="${item.type}" onclick="window.openLibraryView('${item.id}')">
+                            <div class="w-full rounded-[28px] p-5 border space-y-5 flex flex-col relative cursor-pointer active:scale-[0.98] transition-transform ${theme.card} ${theme.border} ${theme.glow} ${inProgressRing} ${doneOpacity}" data-lib-type="${item.type}" onclick="window.openLibraryView('${item.id}')">
                                 <div class="flex justify-between items-start">
                                     <span class="text-3xl filter drop-shadow-md">${item.emoji || (isBook ? '📘' : '🎓')}</span>
                                     <span class="text-[10px] font-bold ${sc} px-3 py-1.5 rounded-xl uppercase tracking-widest border">${statusLabels[item.status] || 'Para Iniciar'}</span>
@@ -576,8 +581,30 @@ export function getDashboardHTML({
                                     </div>
                                 </div>
                             </div>`;
-                        }).join('')
-                    }
+                        };
+
+                        const ORDER = { in_progress: 0, to_do: 1, done: 2 };
+                        const sorted = [...allItems].sort((a, b) => (ORDER[a.status] ?? 1) - (ORDER[b.status] ?? 1));
+                        const active = sorted.filter(i => i.status !== 'done');
+                        const done = sorted.filter(i => i.status === 'done');
+
+                        const activeHTML = active.map(i => renderLibItem(i, false)).join('');
+                        const doneHTML = done.length > 0 ? `
+                            <div class="pt-2">
+                                <button onclick="window.toggleLibDoneSection()" class="w-full flex items-center justify-between px-2 py-3 text-on-surface-variant/60 hover:text-on-surface-variant transition-colors">
+                                    <span class="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-sm">check_circle</span>
+                                        Concluídos (${done.length})
+                                    </span>
+                                    <span class="material-symbols-outlined text-sm transition-transform" id="lib-done-chevron">expand_more</span>
+                                </button>
+                                <div id="lib-done-section" class="hidden space-y-4 pt-2">
+                                    ${done.map(i => renderLibItem(i, true)).join('')}
+                                </div>
+                            </div>` : '';
+
+                        return activeHTML + doneHTML;
+                    })()}
                 </div>
 
                 <!-- Floating Bottom Button -->

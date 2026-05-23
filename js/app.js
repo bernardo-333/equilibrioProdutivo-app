@@ -202,20 +202,34 @@ document.addEventListener('DOMContentLoaded', () => {
             // Logged in
             
             // Pass UID to database
-            DB.init(user.uid);
+            await DB.init(user.uid);
+
+            // Load custom habits (or fall back to defaults)
+            const DEFAULT_HABITS = [
+                { id: 'wakeup_early', name: 'Acordar cedo', icon: 'wb_sunny' },
+                { id: 'gym', name: 'Academia', icon: 'fitness_center' },
+                { id: 'breakfast', name: 'Café da manhã', icon: 'coffee' },
+                { id: 'lunch', name: 'Almoço', icon: 'restaurant' },
+                { id: 'study_dio', name: 'Estudos DIO', icon: 'school' },
+                { id: 'reading', name: 'Leitura', icon: 'menu_book' },
+                { id: 'dinner', name: 'Janta', icon: 'restaurant_menu' },
+                { id: 'fill_notion', name: 'Preencher Notion', icon: 'edit_note' }
+            ];
+            const savedHabits = await DB.getHabits();
+            window.APP_HABITS = savedHabits || DEFAULT_HABITS;
 
             // Hide auth screen, show app UI
             authScreen.classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => {
                 authScreen.classList.add('hidden');
-                
+
                 // Show Main App
                 appContainer.classList.remove('opacity-0', 'pointer-events-none');
                 mainHeader.classList.remove('opacity-0', 'pointer-events-none');
-                
+
                 bottomNav.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-full');
                 document.body.classList.remove('overflow-hidden');
-                
+
                 if (!window.app) {
                     window.app = new App(user);
                 } else {

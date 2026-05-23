@@ -78,12 +78,21 @@ export const DB = {
     return updated;
   },
 
+  // -- Custom Habits --
+  getHabits: async () => {
+    const snap = await DB.getRef('settings/habits').once('value');
+    return snap.exists() ? snap.val() : null;
+  },
+  saveHabits: async (habits) => {
+    await DB.getRef('settings/habits').set(habits);
+  },
+
   // -- Daily Logs / Habits --
   getTodayLog: async () => {
     const today = getTodayStr();
     const snap = await DB.getRef(`daily_logs/${today}`).once('value');
     if (!snap.exists()) {
-      const blank = { habits: {}, mood: null, sleep: null, water: 0, screen_time: 0, instagram: 0, rest_day: false };
+      const blank = { habits: {}, mood: null, sleep: null, water: 0, screen_time: 0, rest_day: false };
       await DB.getRef(`daily_logs/${today}`).set(blank);
       return blank;
     }

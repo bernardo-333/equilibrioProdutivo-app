@@ -1,5 +1,7 @@
 export function getPlannerHTML({
     calendarData,
+    calendarYear,
+    calendarMonth,
     historyDays,
     metrics,
     kanbanData,
@@ -7,7 +9,8 @@ export function getPlannerHTML({
     habitFilterMonthLabel = '',
     fullHistoryRows = [],
     fullHistoryMonths = [],
-    fullHistoryCurrentMonthKey = ''
+    fullHistoryCurrentMonthKey = '',
+    isCurrentMonth = true
 }) {
     // Mood/Sleep visual config (Matches Check-in for UI consistency)
     const moodConfigs = {
@@ -50,7 +53,7 @@ export function getPlannerHTML({
         <button class="${withMonthKey ? 'history-day-row' : ''} w-full text-left border-b border-white/5 hover:bg-white/[0.03] active:bg-white/[0.06] transition-colors"
                 ${withMonthKey ? `data-month-key="${day.monthKey || ''}"` : ''}
                 onclick="window.openDailyDetail('${day.rawDate}')">
-            <div class="grid items-center gap-3 px-3 py-3" style="grid-template-columns: 140px 130px 110px 95px 120px 95px 80px;">
+            <div class="grid items-center gap-3 px-3 py-3" style="grid-template-columns: 140px 130px 110px 95px 120px 80px;">
                 <div class="flex items-center gap-2 leading-none">
                     <span class="text-sm font-extrabold text-[var(--text-primary)]">${day.date}</span>
                     <span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/65">${getWeekdayName(day.rawDate)}</span>
@@ -69,8 +72,6 @@ export function getPlannerHTML({
 
                 <div>${getSleepChip(day.sleep)}</div>
 
-                <div class="text-xs font-bold text-[var(--text-primary)]">${day.instagram || '--:--'}</div>
-
                 <div class="text-xs font-bold text-cyan-300">${Number(day.water || 0)}L</div>
             </div>
         </button>
@@ -80,13 +81,15 @@ export function getPlannerHTML({
 
     // Calendar: calculate start-of-month weekday offset for correct alignment
     const now = new Date();
-    const firstDayOffset = new Date(now.getFullYear(), now.getMonth(), 1).getDay(); // 0=Sun...6=Sat
+    const viewYear = calendarYear ?? now.getFullYear();
+    const viewMonth = calendarMonth ?? now.getMonth();
+    const firstDayOffset = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun...6=Sat
     const emptyOffsets = Array.from({ length: firstDayOffset }, () =>
         `<div class="aspect-square w-full"></div>`
     ).join('');
 
     const calendarGridHTML = emptyOffsets + calendarData.map(d => {
-        const isToday = d.day === now.getDate();
+        const isToday = isCurrentMonth && d.day === now.getDate();
         const canOpen = !d.isFuture;
         const isPerfectDay = d.level === 3 && d.pct === 100;
         let levelClasses = '';
@@ -121,15 +124,18 @@ export function getPlannerHTML({
                 <div class="flex items-center justify-between mb-5 px-1">
                     <div>
                         <h3 class="text-xl font-extrabold text-[var(--text-primary)] font-headline tracking-tighter leading-none">Consistência</h3>
-                        <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60 mt-0.5 block">${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][now.getMonth()]} ${now.getFullYear()}</span>
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-on-surface-variant/60 mt-0.5 block">${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][viewMonth]} ${viewYear}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="window.openHabitFilterModal()" class="h-8 sm:h-10 px-2.5 sm:px-3 rounded-lg sm:rounded-xl border border-white/10 bg-surface-highest text-[9px] sm:text-[10px] font-extrabold tracking-[0.08em] sm:tracking-widest uppercase text-on-surface-variant hover:text-primary transition-colors">
                             Filtrar hábitos
                         </button>
-                        <div class="w-10 h-10 rounded-2xl bg-primary/10 accent-bg/10 flex items-center justify-center">
-                            <span class="material-symbols-outlined text-primary accent-text text-xl">calendar_month</span>
-                        </div>
+                        <button onclick="window.prevCalMonth()" class="w-9 h-9 rounded-xl border border-white/10 bg-surface-highest flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors active:scale-90">
+                            <span class="material-symbols-outlined text-lg">chevron_left</span>
+                        </button>
+                        <button onclick="window.nextCalMonth()" class="w-9 h-9 rounded-xl border border-white/10 flex items-center justify-center transition-colors active:scale-90 ${isCurrentMonth ? 'bg-surface-highest/30 text-on-surface-variant/30 cursor-not-allowed' : 'bg-surface-highest text-on-surface-variant hover:text-primary'}" ${isCurrentMonth ? 'disabled' : ''}>
+                            <span class="material-symbols-outlined text-lg">chevron_right</span>
+                        </button>
                     </div>
                 </div>
 
@@ -204,19 +210,18 @@ export function getPlannerHTML({
             <section class="space-y-4">
                 <div class="flex justify-between items-center px-1">
                     <h3 class="text-xl font-extrabold text-[var(--text-primary)] font-headline tracking-tighter leading-none">Diário de <span class="text-on-surface-variant">Bordo</span></h3>
-                    <span class="text-[10px] text-cyan-300 font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded-full">Abril</span>
+                    <span class="text-[10px] text-cyan-300 font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded-full">${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][now.getMonth()]}</span>
                 </div>
                 
                 <div class="bg-surface-container-low rounded-[32px] p-2 border border-white/5 flex flex-col">
                     <div class="overflow-x-auto rounded-2xl border border-white/5" style="scrollbar-width:none;">
                         <div class="min-w-[760px] bg-surface-container-low/70 backdrop-blur">
-                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 140px 130px 110px 95px 120px 95px 80px;">
+                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 140px 130px 110px 95px 120px 80px;">
                                 <span>Data</span>
                                 <span>Progresso</span>
                                 <span>Humor</span>
                                 <span>Acordou</span>
                                 <span>Sono</span>
-                                <span>Instagram</span>
                                 <span>Água</span>
                             </div>
                             ${initialRows}
@@ -455,13 +460,12 @@ export function getPlannerHTML({
                 <div class="flex-1 overflow-y-auto px-6 py-2 hide-scrollbar">
                     <div class="overflow-x-auto rounded-2xl border border-white/5" style="scrollbar-width:none;">
                         <div class="min-w-[760px] bg-surface-container-low/70 backdrop-blur">
-                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 140px 130px 110px 95px 120px 95px 80px;">
+                            <div class="grid items-center gap-3 px-3 py-3 border-b border-white/8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70" style="grid-template-columns: 140px 130px 110px 95px 120px 80px;">
                                 <span>Data</span>
                                 <span>Progresso</span>
                                 <span>Humor</span>
                                 <span>Acordou</span>
                                 <span>Sono</span>
-                                <span>Instagram</span>
                                 <span>Água</span>
                             </div>
                             <div id="full-history-list">

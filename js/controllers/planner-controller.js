@@ -1,6 +1,26 @@
 import { DB } from '../database.js';
 import { getPlannerHTML } from '../views/planner-view.js';
-const HABITS = [
+
+// Calendar navigation state (persists across re-renders)
+let _calYear = new Date().getFullYear();
+let _calMonth = new Date().getMonth(); // 0-indexed
+
+window.prevCalMonth = () => {
+    _calMonth--;
+    if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+    renderPlanner();
+};
+
+window.nextCalMonth = () => {
+    const now = new Date();
+    if (_calYear < now.getFullYear() || (_calYear === now.getFullYear() && _calMonth < now.getMonth())) {
+        _calMonth++;
+        if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+        renderPlanner();
+    }
+};
+
+const HABITS_FALLBACK = [
     { id: 'wakeup_early', name: 'Acordar cedo' },
     { id: 'gym', name: 'Academia' },
     { id: 'breakfast', name: 'Café da manhã' },
@@ -10,42 +30,19 @@ const HABITS = [
     { id: 'dinner', name: 'Janta' },
     { id: 'fill_notion', name: 'Preencher Notion' }
 ];
-const TOTAL_CHECKINS = HABITS.length;
+const getHabits = () => window.APP_HABITS || HABITS_FALLBACK;
 const MONTH_NAMES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MONTH_NAMES_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-function normalizeDurationValue(value) {
-    const raw = String(value || '').trim();
-    if (!raw) return '';
-
-    const cleaned = raw.replace(/[^0-9:]/g, '');
-    if (!cleaned) return '';
-
-    if (cleaned.includes(':')) {
-        const [hoursPart = '', minutesPart = ''] = cleaned.split(':');
-        const hours = Math.max(0, Number.parseInt(hoursPart || '0', 10) || 0);
-        const minutes = Math.max(0, Math.min(59, Number.parseInt(minutesPart || '0', 10) || 0));
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-    }
-
-    const digits = cleaned.replace(/\D/g, '');
-    if (!digits) return '';
-    if (digits.length <= 2) {
-        return `00:${digits.padStart(2, '0')}`;
-    }
-
-    const hours = digits.slice(0, -2);
-    const minutes = digits.slice(-2);
-    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
-}
 
 function calcDayPct(log) {
     if (!log) return 0;
     if (log.rest_day) return 100;
+    const HABITS = getHabits();
     let c = 0;
     const habits = log.habits || {};
     for (const h of HABITS) { if (habits[h.id]) c++; }
-    return Math.round((c / TOTAL_CHECKINS) * 100);
+    return Math.round((c / HABITS.length) * 100);
 }
 
 export async function renderPlanner() {
@@ -62,11 +59,12 @@ export async function renderPlanner() {
 
     // --- Build calendar and history from REAL daily_logs ---
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth(); // 0-indexed
+    const year = _calYear;
+    const month = _calMonth; // 0-indexed
     const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const todayDate = now.getDate();
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+    const todayDate = isCurrentMonth ? now.getDate() : daysInMonth; // if past month, all days are "past"
     const firstDayOffset = new Date(year, month, 1).getDay();
 
     const monthLogs = await DB.getMonthlyLogs(yearMonth);
@@ -107,7 +105,7 @@ export async function renderPlanner() {
         .map(([ds, log]) => {
             const [y, m, d] = ds.split('-').map(Number);
             const pct = calcDayPct(log);
-            const habits = HABITS.map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
+            const habits = getHabits().map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
             return {
                 date: `${String(d).padStart(2, '0')} ${MONTH_NAMES_SHORT[(m || 1) - 1]}`,
                 rawDate: ds,
@@ -117,7 +115,6 @@ export async function renderPlanner() {
                 sleep: log.sleep || null,
                 water: log.water || 0,
                 wake_time: log.wake_time || '',
-                instagram: log.instagram || '',
                 telas: log.screen_time || 0,
                 income_dia: log.income_dia || 0,
                 expense_dia: log.expense_dia || 0,
@@ -148,20 +145,24 @@ export async function renderPlanner() {
     window._plannerFullHistoryCurrentMonthKey = fullHistoryCurrentMonthKey;
 
     const historyDays = [];
-    for (let d = todayDate; d >= 1; d--) {
-        const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
-        const log = monthLogs[ds];
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+    const curYearMonth = `${curYear}-${String(curMonth + 1).padStart(2, '0')}`;
+    const curMonthLogs = isCurrentMonth ? monthLogs : await DB.getMonthlyLogs(curYearMonth);
+    const curDaysInMonth = isCurrentMonth ? daysInMonth : now.getDate();
+    for (let d = now.getDate(); d >= 1; d--) {
+        const ds = `${curYearMonth}-${String(d).padStart(2, '0')}`;
+        const log = curMonthLogs[ds];
         const pct = log ? calcDayPct(log) : 0;
-        const habits = HABITS.map(h => ({ id: h.id, name: h.name, done: !!(log?.habits?.[h.id]) }));
+        const habits = getHabits().map(h => ({ id: h.id, name: h.name, done: !!(log?.habits?.[h.id]) }));
         historyDays.push({
-            date: `${String(d).padStart(2,'0')} ${MONTH_NAMES_SHORT[month]}`,
+            date: `${String(d).padStart(2,'0')} ${MONTH_NAMES_SHORT[curMonth]}`,
             rawDate: ds,
             pct,
             mood: log?.mood || null,
             sleep: log?.sleep || null,
             water: log?.water || 0,
             wake_time: log?.wake_time || '',
-            instagram: log?.instagram || '',
             telas: log?.screen_time || 0,
             income_dia: log?.income_dia || 0,
             expense_dia: log?.expense_dia || 0,
@@ -216,10 +217,13 @@ export async function renderPlanner() {
 
     root.innerHTML = getPlannerHTML({
         calendarData,
+        calendarYear: year,
+        calendarMonth: month,
+        isCurrentMonth,
         historyDays,
         metrics,
         kanbanData,
-        habitCatalog: HABITS,
+        habitCatalog: getHabits(),
         habitFilterMonthLabel: `${MONTH_NAMES_FULL[month]} ${year}`,
         fullHistoryRows: allHistoryDays,
         fullHistoryMonths,
@@ -236,7 +240,8 @@ function renderHabitFilterCalendar() {
     const state = window._plannerHabitFilter;
     if (!state) return;
 
-    const habitId = window._plannerHabitFilterCurrentHabit || 'gym';
+    const HABITS = getHabits();
+    const habitId = window._plannerHabitFilterCurrentHabit || HABITS[0]?.id || 'gym';
     const habit = HABITS.find(h => h.id === habitId) || HABITS[0];
     const grid = document.getElementById('habit-filter-grid');
     const summary = document.getElementById('habit-filter-summary');
@@ -336,14 +341,13 @@ window.openDailyDetail = (date, isEditMode = false) => {
             sleep: null,
             water: 0,
             wake_time: '',
-            instagram: '',
             telas: 0,
             income_dia: 0,
             expense_dia: 0,
             income_din: 0,
             expense_din: 0,
             restDay: false,
-            habits: HABITS.map(h => ({ id: h.id, name: h.name, done: false }))
+            habits: getHabits().map(h => ({ id: h.id, name: h.name, done: false }))
         };
         isEditMode = true;
     }
@@ -445,18 +449,11 @@ window.openDailyDetail = (date, isEditMode = false) => {
                 Seu corpo e tempo ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
             </h3>
             <div class="grid grid-cols-2 gap-4">
-                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
+                <div class="col-span-2 bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
                     <span class="text-xs font-bold text-on-surface-variant px-1">Hora que acordou</span>
                     ${isEditMode
                         ? `<input id="input-planner-wake-time" type="time" value="${day.wake_time || ''}" placeholder="00:00" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline" style="color-scheme: dark;">`
                         : `<span class="text-2xl font-extrabold text-[var(--text-primary)] pl-1 font-headline">${day.wake_time || '--:--'}</span>`}
-                </div>
-
-                <div class="bg-surface-container rounded-3xl p-4 border border-white/5 space-y-2 ${isEditMode ? 'focus-within:ring-2 focus-within:ring-primary/50' : ''}">
-                    <span class="text-xs font-bold text-on-surface-variant px-1">Tempo no Instagram</span>
-                    ${isEditMode
-                        ? `<input id="input-planner-instagram" type="text" inputmode="numeric" value="${day.instagram || ''}" placeholder="00:40" maxlength="5" onblur="this.value = window.normalizeDurationValue ? window.normalizeDurationValue(this.value) : this.value" class="w-full bg-transparent border-none text-2xl font-extrabold text-[var(--text-primary)] p-0 pl-1 focus:outline-none focus:ring-0 text-left font-headline tracking-wider" autocomplete="off"><span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 px-1">Formato hh:mm</span>`
-                        : `<span class="text-2xl font-extrabold text-[var(--text-primary)] pl-1 font-headline">${day.instagram || '--:--'}</span>`}
                 </div>
 
                 <div class="col-span-2 bg-surface-container rounded-3xl p-5 border border-white/5 flex flex-col items-center gap-4">
@@ -535,7 +532,7 @@ window.openDailyDetail = (date, isEditMode = false) => {
         <section class="space-y-4">
             <div class="flex justify-between items-center pl-2 pr-1">
                 <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} flex items-center gap-2">
-                    As 8 Rotinas ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
+                    As ${getHabits().length} Rotinas ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
                 </h3>
                 <span class="text-[10px] font-bold ${day.restDay ? 'text-amber-300' : 'text-primary accent-text'}">${day.restDay ? 'Descanso' : `${day.habits.filter(h=>h.done).length}/${day.habits.length}`}</span>
             </div>
@@ -649,13 +646,9 @@ window.saveAndCloseDailyDetail = async (date) => {
     const updates = [];
 
     const wakeTimeInput = document.getElementById('input-planner-wake-time');
-    const instagramInput = document.getElementById('input-planner-instagram');
 
     if (wakeTimeInput) {
         updates.push(DB.updateDailyMetrics('wake_time', wakeTimeInput.value || '', date));
-    }
-    if (instagramInput) {
-        updates.push(DB.updateDailyMetrics('instagram', normalizeDurationValue(instagramInput.value || ''), date));
     }
 
     // Busca os 4 campos se estiverem renderizados no HTML

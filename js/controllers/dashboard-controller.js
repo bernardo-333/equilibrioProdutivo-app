@@ -1,8 +1,9 @@
 import { DB } from '../database.js';
 import { getDashboardHTML } from '../views/dashboard-view.js';
 
-// The exhaustive list of 8 routine base habits
-const ALL_HABITS = [
+// Habits come from window.APP_HABITS (loaded in app.js from Firebase)
+// Fallback for first render before auth completes
+const ALL_HABITS_FALLBACK = [
     { id: 'wakeup_early', name: 'Acordar cedo', icon: 'wb_sunny' },
     { id: 'gym', name: 'Academia', icon: 'fitness_center' },
     { id: 'breakfast', name: 'Café da manhã', icon: 'coffee' },
@@ -12,6 +13,7 @@ const ALL_HABITS = [
     { id: 'dinner', name: 'Janta', icon: 'restaurant_menu' },
     { id: 'fill_notion', name: 'Preencher Notion', icon: 'edit_note' }
 ];
+const getAllHabits = () => window.APP_HABITS || ALL_HABITS_FALLBACK;
 
 function getDashboardBalances(allLogs, todayStr) {
     const logs = Object.values(allLogs || {});
@@ -29,6 +31,7 @@ function calcDayPctFromLog(log) {
     if (!log) return 0;
     if (log.rest_day) return 100;
 
+    const ALL_HABITS = getAllHabits();
     let habitsCompleted = 0;
     const habits = log.habits || {};
     for (const habit of ALL_HABITS) {
@@ -53,32 +56,6 @@ function getMondayOnOrBefore(dateObj) {
     return d;
 }
 
-function normalizeDurationValue(value) {
-    const raw = String(value || '').trim();
-    if (!raw) return '';
-
-    const cleaned = raw.replace(/[^0-9:]/g, '');
-    if (!cleaned) return '';
-
-    if (cleaned.includes(':')) {
-        const [hoursPart = '', minutesPart = ''] = cleaned.split(':');
-        const hours = Math.max(0, Number.parseInt(hoursPart || '0', 10) || 0);
-        const minutes = Math.max(0, Math.min(59, Number.parseInt(minutesPart || '0', 10) || 0));
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-    }
-
-    const digits = cleaned.replace(/\D/g, '');
-    if (!digits) return '';
-    if (digits.length <= 2) {
-        return `00:${digits.padStart(2, '0')}`;
-    }
-
-    const hours = digits.slice(0, -2);
-    const minutes = digits.slice(-2);
-    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
-}
-
-window.normalizeDurationValue = normalizeDurationValue;
 
 export async function renderDashboard() {
     const root = document.getElementById('dashboard-root');
@@ -90,6 +67,7 @@ export async function renderDashboard() {
         window._libraryItems = libraryItems;
 
         // Calculate completion metrics
+        const ALL_HABITS = getAllHabits();
         let habitsCompleted = 0;
         if (!todayLog.habits) todayLog.habits = {};
         for (const habit of ALL_HABITS) {
@@ -214,7 +192,7 @@ export async function renderDashboard() {
             snapMessage = "O dia está voando. Hora do primeiro check-in!";
         }
         // Generate the dynamic view UI
-        root.innerHTML = getDashboardHTML({ 
+        root.innerHTML = getDashboardHTML({
             todayLog,
             balances,
             todayPct,
@@ -223,7 +201,7 @@ export async function renderDashboard() {
             weekData,
             snapWeeks,
             currentWeekIndex: selectedWeekIndex,
-            DEFAULT_HABITS: ALL_HABITS,
+            DEFAULT_HABITS: getAllHabits(),
             snapMessage,
             libraryItems
         });
@@ -297,7 +275,7 @@ window.openCheckinModal = async () => {
     if (lblDate) lblDate.textContent = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.','').toUpperCase();
     if (lblDay) lblDay.textContent = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
 
-    // Pre-select saved mood/sleep/water/wake_time/instagram
+    // Pre-select saved mood/sleep/water/wake_time
     const todayLog = await DB.getTodayLog();
 
     // Mood chips
@@ -337,9 +315,7 @@ window.openCheckinModal = async () => {
 
     // Time inputs
     const wakeTimeInput = document.getElementById('input-wake-time');
-    const instagramInput = document.getElementById('input-instagram');
     if (wakeTimeInput) wakeTimeInput.value = todayLog.wake_time || '';
-    if (instagramInput) instagramInput.value = normalizeDurationValue(todayLog.instagram || '');
 
     // Rest day toggle
     window.toggleRestDay(!!todayLog.rest_day, true);
@@ -352,16 +328,12 @@ window.openCheckinModal = async () => {
 };
 
 window.closeCheckinModal = async () => {
-    // Save wake_time and instagram before closing
+    // Save wake_time before closing
     const wakeTimeInput = document.getElementById('input-wake-time');
-    const instagramInput = document.getElementById('input-instagram');
     const updates = [];
 
     if (wakeTimeInput) {
         updates.push(DB.updateDailyMetrics('wake_time', wakeTimeInput.value || ''));
-    }
-    if (instagramInput) {
-        updates.push(DB.updateDailyMetrics('instagram', normalizeDurationValue(instagramInput.value || '')));
     }
 
     const restBtn = document.getElementById('rest-day-toggle-checkin');
@@ -544,8 +516,8 @@ window.filterLibrary = (filter) => {
         activeBtn.classList.remove('bg-surface-highest', 'text-on-surface-variant', 'border-white/10');
         activeBtn.classList.add('bg-primary/20', 'text-primary', 'border-primary/30');
     }
-    // Filter list items
-    document.querySelectorAll('#library-modal-list > [data-lib-type]').forEach(el => {
+    // Filter list items (including those inside done-section)
+    document.querySelectorAll('#library-modal-list [data-lib-type]').forEach(el => {
         if (filter === 'all' || el.dataset.libType === filter) {
             el.classList.remove('hidden');
         } else {
@@ -757,6 +729,15 @@ window.deleteLibraryItem = async () => {
     }
 };
 
+window.toggleLibDoneSection = () => {
+    const section = document.getElementById('lib-done-section');
+    const chevron = document.getElementById('lib-done-chevron');
+    if (!section || !chevron) return;
+    const isHidden = section.classList.contains('hidden');
+    section.classList.toggle('hidden', !isHidden);
+    chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
+};
+
 window.setWaterInput = async (liters) => {
     await DB.updateDailyMetrics('water', liters);
     for (let i = 1; i <= 5; i++) {
@@ -886,8 +867,9 @@ window.toggleRestDay = async (forceValue = null, silent = false) => {
 
 async function recalculateProgress() {
     const todayLog = await DB.getTodayLog();
+    const ALL_HABITS = getAllHabits();
     let habitsCompleted = 0;
-    
+
     if (!todayLog.habits) todayLog.habits = {};
     for (const habit of ALL_HABITS) {
         if (todayLog.habits[habit.id]) {
