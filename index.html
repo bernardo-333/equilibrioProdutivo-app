@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
     <!-- Custom Styles -->
-  <script type="module" crossorigin src="./assets/index-Ce7dwh8F.js"></script>
+  <script type="module" crossorigin src="./assets/index-BiIBnKwP.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/firebase-CNzVcu9p.js">
   <link rel="stylesheet" crossorigin href="./assets/index-nWvlMp5R.css">
 <link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
@@ -88,7 +88,12 @@
         </div>
     </section>
 
-
+    <!-- Tab 4: Configurações -->
+    <section id="tab-settings" class="tab-content">
+        <div id="settings-root">
+             <p class="text-center text-on-surface-variant mt-10">Carregando configurações...</p>
+        </div>
+    </section>
 
 </main>
 
@@ -108,6 +113,11 @@
     <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-finances" data-title="Financeiro" id="nav-finances">
         <span class="material-symbols-outlined" data-icon="payments">payments</span>
         <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Finanças</span>
+    </div>
+
+    <div class="nav-item flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-white transition-all active:scale-90 duration-200 cursor-pointer" data-target="tab-settings" data-title="Configurações" id="nav-settings">
+        <span class="material-symbols-outlined" data-icon="settings">settings</span>
+        <span class="font-headline text-[11px] font-medium tracking-wide uppercase">Config</span>
     </div>
 
 </nav>
