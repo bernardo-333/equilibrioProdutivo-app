@@ -1,8 +1,4 @@
-/**
- * database.js
- * Abstraction layer for data storage using Firebase Realtime Database (Fase 2)
- * Includes a one-time migration from LocalStorage for seamless UX.
- */
+import firebase from './firebase.js';
 
 const STORAGE_KEY = 'equilibrio_produtivo_data';
 

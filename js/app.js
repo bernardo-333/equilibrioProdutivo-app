@@ -1,33 +1,9 @@
+import firebase from './firebase.js';
 import { DB } from './database.js';
 import { renderDashboard } from './controllers/dashboard-controller.js';
 import { renderPlanner } from './controllers/planner-controller.js';
 import { renderFinances } from './ui-finances.js';
 import { renderSettings } from './ui-settings.js';
-
-// Register Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .catch(err => console.error('SW registration failed:', err));
-  });
-}
-
-// Firebase Configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBIlCbxhxEucKdBNyMWEwRuFOpEo0dVQx8",
-  authDomain: "equilibrioprodutivo-app.firebaseapp.com",
-  databaseURL: "https://equilibrioprodutivo-app-default-rtdb.firebaseio.com",
-  projectId: "equilibrioprodutivo-app",
-  storageBucket: "equilibrioprodutivo-app.firebasestorage.app",
-  messagingSenderId: "785521986199",
-  appId: "1:785521986199:web:449d7fe7979e0aad8db7d2",
-  measurementId: "G-2FZ69XYWZJ"
-};
-
-// Initialize Firebase
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
 
 function ensureToastHost() {
     let host = document.getElementById('app-toast-host');

@@ -6,53 +6,29 @@
     <meta name="theme-color" content="#1E1E1E">
     <title>Equilíbrio Produtivo</title>
     
-    <link rel="icon" type="image/png" href="./images/logo.png">
-    <link rel="apple-touch-icon" href="./images/Logo%20100.png">
-    
+    <link rel="icon" type="image/webp" href="./images/logo.webp">
+    <link rel="apple-touch-icon" href="./images/logo.webp">
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="./manifest.json">
-    
-    <!-- Tailwind CSS (CDN for MVP) -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    
-    <!-- Firebase CDNs (Compat v9) -->
-    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-database-compat.js"></script>
 
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    
+
     <!-- Custom Styles -->
     <link rel="stylesheet" href="./css/style.css">
-    
-    <!-- Tailwind Configuration (MVP fallback) -->
-    <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              "surface-container-highest": "#333333",
-              "surface-container-low": "#242424",
-              "primary": "#3b82f6"
-            }
-          }
-        }
-      }
-    </script>
 </head>
 <body class="antialiased overflow-hidden">
 
 <!-- SPLASH / LOGIN TELA -->
 <div id="auth-screen" class="fixed inset-0 z-[100] bg-[#1a1a1a] flex flex-col items-center justify-center transition-all duration-500">
     <div class="absolute inset-0 pointer-events-none overflow-hidden">
-        <img src="./images/logo.png" alt="" class="w-full h-full object-cover scale-125 opacity-20 blur-[1px]" />
+        <img src="./images/logo.webp" alt="" class="w-full h-full object-cover scale-125 opacity-20 blur-[1px]" />
         <div class="absolute inset-0 bg-gradient-to-b from-[#101010]/35 via-[#1a1a1a]/88 to-[#1a1a1a]"></div>
     </div>
     <div class="flex flex-col items-center gap-6 max-w-sm w-full px-6">
         <div class="w-28 h-28 rounded-[36px] bg-white/5 p-4 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex items-center justify-center">
-            <img src="./images/logo.png" alt="Equilíbrio Produtivo" class="w-full h-full object-contain">
+            <img src="./images/logo.webp" alt="Equilíbrio Produtivo" class="w-full h-full object-contain">
         </div>
         <div class="text-center space-y-2">
             <h1 class="text-3xl font-extrabold text-white font-headline">Equilíbrio<br/><span class="text-primary italic">Produtivo</span></h1>
