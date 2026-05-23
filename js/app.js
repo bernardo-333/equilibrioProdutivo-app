@@ -172,6 +172,9 @@ class App {
             case 'tab-finances':
                 renderFinances();
                 break;
+            case 'tab-settings':
+                renderSettings();
+                break;
         }
     }
 }
