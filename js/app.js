@@ -221,6 +221,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const savedHabits = await DB.getHabits();
             window.APP_HABITS = savedHabits || DEFAULT_HABITS;
 
+            const settings = await DB.getSettings();
+            if (settings?.accent_color) {
+                document.documentElement.style.setProperty('--accent-color', settings.accent_color);
+            }
+
             // Hide auth screen, show app UI
             authScreen.classList.add('opacity-0', 'pointer-events-none');
             setTimeout(() => {

@@ -46,16 +46,6 @@ export async function renderSettings() {
                     <span class="text-sm font-bold">Gerenciar Hábitos Diários</span>
                     <span class="material-symbols-outlined text-on-surface-variant group-hover:text-white">chevron_right</span>
                 </button>
-                <div class="my-2"></div>
-                <button class="w-full text-left p-4 rounded-xl bg-surface-container-highest flex items-center justify-between group hover:bg-surface-highest transition-colors">
-                    <span class="text-sm font-bold">Exportar Dados</span>
-                    <span class="material-symbols-outlined text-on-surface-variant group-hover:text-white">download</span>
-                </button>
-                <div class="my-2"></div>
-                <button onclick="window.clearData()" class="w-full text-left p-4 rounded-xl bg-secondary/10 flex items-center justify-between group hover:bg-secondary/20 transition-colors">
-                    <span class="text-sm font-bold text-secondary">Apagar todos os dados</span>
-                    <span class="material-symbols-outlined text-secondary">delete</span>
-                </button>
             </div>
         </section>
     `;
@@ -229,9 +219,3 @@ window.changeAccentColor = async (colorHex) => {
     renderSettings();
 };
 
-window.clearData = () => {
-    if(confirm('Tem certeza? Isso apagará o MVP inteiro do localStorage.')){
-        localStorage.removeItem('equilibrio_produtivo_data');
-        window.location.reload();
-    }
-};
