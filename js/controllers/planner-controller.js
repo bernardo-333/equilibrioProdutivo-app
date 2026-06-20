@@ -31,14 +31,17 @@ const HABITS_FALLBACK = [
     { id: 'fill_notion', name: 'Preencher Notion' }
 ];
 const getHabits = () => window.APP_HABITS || HABITS_FALLBACK;
+const getActiveHabits = () => getHabits().filter(h => !h.deletedAt);
+const getHabitsForDate = (dateStr) => getHabits().filter(h => (!h.createdAt || h.createdAt <= dateStr) && (!h.deletedAt || dateStr < h.deletedAt));
 const MONTH_NAMES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MONTH_NAMES_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 
-function calcDayPct(log) {
+function calcDayPct(log, dateStr) {
     if (!log) return 0;
     if (log.rest_day) return 100;
-    const HABITS = getHabits();
+    const HABITS = getHabitsForDate(dateStr);
+    if (!HABITS.length) return 0;
     let c = 0;
     const habits = log.habits || {};
     for (const h of HABITS) { if (habits[h.id]) c++; }
@@ -75,7 +78,7 @@ export async function renderPlanner() {
     for (let d = 1; d <= daysInMonth; d++) {
         const ds = `${yearMonth}-${String(d).padStart(2, '0')}`;
         const log = monthLogs[ds];
-        const pct = calcDayPct(log);
+        const pct = calcDayPct(log, ds);
         const hasLog = !!log;
         const isRestDay = !!(log && log.rest_day);
         let level = 0;
@@ -104,8 +107,8 @@ export async function renderPlanner() {
         .sort((a, b) => b[0].localeCompare(a[0]))
         .map(([ds, log]) => {
             const [y, m, d] = ds.split('-').map(Number);
-            const pct = calcDayPct(log);
-            const habits = getHabits().map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
+            const pct = calcDayPct(log, ds);
+            const habits = getHabitsForDate(ds).map(h => ({ id: h.id, name: h.name, done: !!(log.habits && log.habits[h.id]) }));
             return {
                 date: `${String(d).padStart(2, '0')} ${MONTH_NAMES_SHORT[(m || 1) - 1]}`,
                 rawDate: ds,
@@ -153,8 +156,8 @@ export async function renderPlanner() {
     for (let d = now.getDate(); d >= 1; d--) {
         const ds = `${curYearMonth}-${String(d).padStart(2, '0')}`;
         const log = curMonthLogs[ds];
-        const pct = log ? calcDayPct(log) : 0;
-        const habits = getHabits().map(h => ({ id: h.id, name: h.name, done: !!(log?.habits?.[h.id]) }));
+        const pct = log ? calcDayPct(log, ds) : 0;
+        const habits = getHabitsForDate(ds).map(h => ({ id: h.id, name: h.name, done: !!(log?.habits?.[h.id]) }));
         historyDays.push({
             date: `${String(d).padStart(2,'0')} ${MONTH_NAMES_SHORT[curMonth]}`,
             rawDate: ds,
@@ -186,7 +189,7 @@ export async function renderPlanner() {
 
     // Calculate real metrics
     const logsArr = Object.values(monthLogs);
-    const perfectDays = logsArr.filter(l => calcDayPct(l) === 100 && !l.rest_day).length;
+    const perfectDays = Object.entries(monthLogs).filter(([ds, l]) => calcDayPct(l, ds) === 100 && !l.rest_day).length;
 
     const sleepLabels = { 'perfeito': 5, 'muito_bom': 4, 'bom': 3, 'mais_ou_menos': 2, 'ruim': 1 };
     const sleepReverse = { 5: 'perfeito', 4: 'muito_bom', 3: 'bom', 2: 'mais_ou_menos', 1: 'ruim' };
@@ -223,7 +226,7 @@ export async function renderPlanner() {
         historyDays,
         metrics,
         kanbanData,
-        habitCatalog: getHabits(),
+        habitCatalog: getActiveHabits(),
         habitFilterMonthLabel: `${MONTH_NAMES_FULL[month]} ${year}`,
         fullHistoryRows: allHistoryDays,
         fullHistoryMonths,
@@ -240,7 +243,7 @@ function renderHabitFilterCalendar() {
     const state = window._plannerHabitFilter;
     if (!state) return;
 
-    const HABITS = getHabits();
+    const HABITS = getActiveHabits();
     const habitId = window._plannerHabitFilterCurrentHabit || HABITS[0]?.id || 'gym';
     const habit = HABITS.find(h => h.id === habitId) || HABITS[0];
     const grid = document.getElementById('habit-filter-grid');
@@ -347,7 +350,7 @@ window.openDailyDetail = (date, isEditMode = false) => {
             income_din: 0,
             expense_din: 0,
             restDay: false,
-            habits: getHabits().map(h => ({ id: h.id, name: h.name, done: false }))
+            habits: getHabitsForDate(date).map(h => ({ id: h.id, name: h.name, done: false }))
         };
         isEditMode = true;
     }
@@ -532,7 +535,7 @@ window.openDailyDetail = (date, isEditMode = false) => {
         <section class="space-y-4">
             <div class="flex justify-between items-center pl-2 pr-1">
                 <h3 class="text-[11px] font-bold tracking-widest uppercase ${isEditMode ? 'text-primary accent-text' : 'text-on-surface-variant/70'} flex items-center gap-2">
-                    As ${getHabits().length} Rotinas ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
+                    As ${day.habits.length} Rotinas ${isEditMode ? '<span class="material-symbols-outlined text-[14px]">edit</span>' : ''}
                 </h3>
                 <span class="text-[10px] font-bold ${day.restDay ? 'text-amber-300' : 'text-primary accent-text'}">${day.restDay ? 'Descanso' : `${day.habits.filter(h=>h.done).length}/${day.habits.length}`}</span>
             </div>

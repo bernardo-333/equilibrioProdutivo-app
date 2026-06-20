@@ -9,6 +9,11 @@ const HABIT_ICONS = [
     'local_library', 'sports_soccer', 'hiking', 'spa', 'timer'
 ];
 
+const getTodayDateStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export async function renderSettings() {
     const root = document.getElementById('settings-root');
     const settings = await DB.getSettings();
@@ -54,7 +59,7 @@ export async function renderSettings() {
 // ---- Habits Manager ----
 
 function renderHabitsManagerContent() {
-    const habits = window.APP_HABITS || [];
+    const habits = (window.APP_HABITS || []).filter(h => !h.deletedAt);
     const iconOptions = HABIT_ICONS.map(ic =>
         `<button data-icon="${ic}" onclick="window._habitIconPick('${ic}', this)" class="habit-icon-opt w-10 h-10 rounded-xl border border-white/10 bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/40 transition-all">
             <span class="material-symbols-outlined text-lg">${ic}</span>
@@ -115,7 +120,7 @@ window.openHabitsManager = () => {
                 <div>
                     <div class="w-12 h-[5px] bg-surface-highest rounded-full mx-auto mb-3"></div>
                     <h2 class="text-2xl font-extrabold text-[var(--text-primary)] font-headline">Gerenciar Hábitos</h2>
-                    <span class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/60">${(window.APP_HABITS || []).length} hábitos ativos</span>
+                    <span class="text-[11px] font-bold tracking-widest uppercase text-on-surface-variant/60">${(window.APP_HABITS || []).filter(h => !h.deletedAt).length} hábitos ativos</span>
                 </div>
                 <button onclick="window.closeHabitsManager()" class="w-10 h-10 rounded-full bg-surface-highest flex items-center justify-center text-on-surface-variant hover:text-white transition-colors">
                     <span class="material-symbols-outlined">close</span>
@@ -171,7 +176,7 @@ window._addHabit = () => {
     const icon = iconInput?.value || 'check_circle';
     const id = name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
     const habits = window.APP_HABITS || [];
-    habits.push({ id, name, icon });
+    habits.push({ id, name, icon, createdAt: getTodayDateStr() });
     window.APP_HABITS = habits;
 
     if (nameInput) nameInput.value = '';
@@ -183,11 +188,15 @@ window._addHabit = () => {
 };
 
 window._removeHabit = (habitId) => {
-    if ((window.APP_HABITS || []).length <= 1) {
+    const allHabits = window.APP_HABITS || [];
+    if (allHabits.filter(h => !h.deletedAt).length <= 1) {
         window.showToast?.('Você precisa ter pelo menos 1 hábito.', 'error');
         return;
     }
-    window.APP_HABITS = (window.APP_HABITS || []).filter(h => h.id !== habitId);
+    // Soft-delete: mantém o hábito no histórico, só marca a data em que parou de valer.
+    const habit = allHabits.find(h => h.id === habitId);
+    if (habit) habit.deletedAt = getTodayDateStr();
+    window.APP_HABITS = allHabits;
     const modal = document.getElementById('habits-manager-modal');
     const scrollArea = modal?.querySelector('.flex-1.overflow-y-auto');
     if (scrollArea) scrollArea.innerHTML = renderHabitsManagerContent();

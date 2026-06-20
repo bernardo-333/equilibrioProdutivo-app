@@ -14,6 +14,8 @@ const ALL_HABITS_FALLBACK = [
     { id: 'fill_notion', name: 'Preencher Notion', icon: 'edit_note' }
 ];
 const getAllHabits = () => window.APP_HABITS || ALL_HABITS_FALLBACK;
+const getActiveHabits = () => getAllHabits().filter(h => !h.deletedAt);
+const getHabitsForDate = (dateStr) => getAllHabits().filter(h => (!h.createdAt || h.createdAt <= dateStr) && (!h.deletedAt || dateStr < h.deletedAt));
 
 function getDashboardBalances(allLogs, todayStr) {
     const logs = Object.values(allLogs || {});
@@ -27,11 +29,12 @@ function getDashboardBalances(allLogs, todayStr) {
     return { diaBalance, dinheiroBalance };
 }
 
-function calcDayPctFromLog(log) {
+function calcDayPctFromLog(log, dateStr) {
     if (!log) return 0;
     if (log.rest_day) return 100;
 
-    const ALL_HABITS = getAllHabits();
+    const ALL_HABITS = getHabitsForDate(dateStr);
+    if (!ALL_HABITS.length) return 0;
     let habitsCompleted = 0;
     const habits = log.habits || {};
     for (const habit of ALL_HABITS) {
@@ -67,7 +70,9 @@ export async function renderDashboard() {
         window._libraryItems = libraryItems;
 
         // Calculate completion metrics
-        const ALL_HABITS = getAllHabits();
+        const now = new Date();
+        const todayStr = formatDateKeyLocal(now);
+        const ALL_HABITS = getActiveHabits();
         let habitsCompleted = 0;
         if (!todayLog.habits) todayLog.habits = {};
         for (const habit of ALL_HABITS) {
@@ -75,14 +80,12 @@ export async function renderDashboard() {
         }
 
         const isRestDay = !!todayLog.rest_day;
-        const todayPct = calcDayPctFromLog(todayLog);
+        const todayPct = calcDayPctFromLog(todayLog, todayStr);
         const missing = ALL_HABITS.length - habitsCompleted;
         const isAllDone = isRestDay || habitsCompleted === ALL_HABITS.length;
 
         // Build weekly snap carousel from all weeks of current month (Mon-Fri)
         const dayNames = ['D','S','T','Q','Q','S','S'];
-        const now = new Date();
-        const todayStr = formatDateKeyLocal(now);
         const allLogs = await DB.getAllDailyLogs();
         const balances = getDashboardBalances(allLogs, todayStr);
 
@@ -113,7 +116,7 @@ export async function renderDashboard() {
                 if (inCurrentMonth) hasMonthDay = true;
 
                 const log = inCurrentMonth ? allLogs?.[ds] : null;
-                const pct = inCurrentMonth ? calcDayPctFromLog(log) : 0;
+                const pct = inCurrentMonth ? calcDayPctFromLog(log, ds) : 0;
                 const isRestDayLog = !!(log && log.rest_day);
 
                 const state = !inCurrentMonth
@@ -201,7 +204,7 @@ export async function renderDashboard() {
             weekData,
             snapWeeks,
             currentWeekIndex: selectedWeekIndex,
-            DEFAULT_HABITS: getAllHabits(),
+            DEFAULT_HABITS: getActiveHabits(),
             snapMessage,
             libraryItems
         });
@@ -867,7 +870,7 @@ window.toggleRestDay = async (forceValue = null, silent = false) => {
 
 async function recalculateProgress() {
     const todayLog = await DB.getTodayLog();
-    const ALL_HABITS = getAllHabits();
+    const ALL_HABITS = getActiveHabits();
     let habitsCompleted = 0;
 
     if (!todayLog.habits) todayLog.habits = {};
